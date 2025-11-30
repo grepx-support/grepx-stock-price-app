@@ -6,5 +6,9 @@ dagster-webserver
 flower
 dagit
 dagster-postgres
+omegaconf
+
 # celery_framework and dagster_framework are installed via orchestrator.sh
+-e ../../libs/celery_framework
+-e ../../libs/dagster_framework
 

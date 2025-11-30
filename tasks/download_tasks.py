@@ -1,15 +1,17 @@
 """Celery task for downloading stock close prices."""
 
-from celery import shared_task
+from celery_framework.tasks.decorators import task
 import time
 import random
 
-@shared_task(name="tasks.download_close_price")
+@task(name="tasks.download_close_price")
 def download_close_price(symbol: str):
+
     """
     Download close price for a stock symbol.
     This would normally call an API, but we'll simulate it.
     """
+
     print(f"Downloading close price for {symbol}...")
     time.sleep(2)  # Simulate API call
     

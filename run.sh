@@ -88,15 +88,15 @@ echo "Starting services..."
 export PYTHONPATH="$(pwd)/.."
 
 echo "Starting Celery worker..."
-$CELERY -A price_app.app.celery_app worker --loglevel=info &
+$CELERY -A price_app.app.celery_framework_app worker --loglevel=info &
 CELERY_PID=$!
 
 echo "Starting Flower..."
-$CELERY -A price_app.app.celery_app flower --port=5555 &
+$CELERY -A price_app.app.celery_framework_app flower --port=5555 &
 FLOWER_PID=$!
 
 echo "Starting Dagster..."
-$PYTHON -m dagster dev -m price_app.app.dagster_app --port 3000 > dagster.log 2>&1 &
+$PYTHON -m dagster dev -m price_app.app.dagster_framework_app --port 3000 > dagster.log 2>&1 &
 DAGSTER_PID=$!
 
 # -----------------------------

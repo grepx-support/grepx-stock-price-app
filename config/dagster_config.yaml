@@ -2,11 +2,11 @@
 app:
   name: "stock_data_app"
   version: "1.0.0"
-  environment: ${APP_ENV:local}
+  environment: ${oc.env:APP_ENV,local}
 
 dagster:
   module_name: "stock_data_app"
-  home: "${PROJECT_ROOT}/dagster_home"  # Can be overridden with DAGSTER_HOME environment variable
+  home: ${oc.env:PROJECT_ROOT}/dagster_home # Can be overridden with DAGSTER_HOME environment variable
 
 storage:
   backend: "sqlite"
@@ -28,8 +28,28 @@ assets:
   modules:
     - "assets.stock_assets"
   directories: []
+  config:
+    close_price_download:
+      symbols:
+        - "AAPL"
+        - "GOOGL"
+        - "MSFT"
+        - "TSLA"
+      celery_task: "tasks.download_close_price"
+      timeout: 60  # seconds
+
+jobs:
+  - name: "download_job"
+    assets:
+      - "close_price_download"
+  - name: "all_assets_job"
+    assets: "__all__"
 
 ops:
   modules: []
   directories: []
+
+resources:
+  default_resources: true
+  custom_resources: []
 
