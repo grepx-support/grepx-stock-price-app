@@ -24,14 +24,6 @@ fi
 echo "Installing requirements..."
 $PIP install -r requirements.txt
 
-echo "Installing dependencies from libs..."
-for lib_dir in $LIBS_DIR/*; do
-    if [ -d "$lib_dir" ]; then
-        echo "Installing $(basename $lib_dir)..."
-        $PIP install -e "$lib_dir"
-    fi
-done
-
 echo ""
 echo "Setup complete!"
 echo "Run: ./run.sh"
