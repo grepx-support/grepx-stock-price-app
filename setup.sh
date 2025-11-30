@@ -34,4 +34,4 @@ done
 
 echo ""
 echo "Setup complete!"
-echo "Run: ./app_run.sh"
+echo "Run: ./run.sh"
