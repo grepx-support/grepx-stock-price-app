@@ -2,6 +2,7 @@
 
 from dagster import asset
 from tasks.download_tasks import download_close_price
+from app.celery_app import app as celery_app
 
 @asset(group_name="stock_data")
 def close_price_download():
@@ -13,7 +14,8 @@ def close_price_download():
     results = []
     for symbol in symbols:
         # Trigger Celery task asynchronously
-        task = download_close_price.delay(symbol)
+        # task = download_close_price.delay(symbol)
+        task = celery_app.send_task("tasks.download_close_price", args=[symbol])
         
         # Wait for result (or you can store task_id and check later)
         result = task.get(timeout=10)

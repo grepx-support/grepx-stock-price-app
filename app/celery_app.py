@@ -5,7 +5,9 @@ import yaml
 from celery import Celery
 
 # Load configuration
-config_path = os.path.join(os.path.dirname(__file__), "config", "celery_config.yaml")
+config_path = os.path.join(os.path.dirname(__file__),"..", "config", "celery_config.yaml")
+if not os.path.exists(config_path):
+    raise FileNotFoundError(f"Celery config file not found: {config_path}")
 with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
@@ -42,5 +44,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-app.autodiscover_tasks(["tasks"])
+app.autodiscover_tasks(["price_app.tasks"])
 
+import price_app.tasks.download_tasks

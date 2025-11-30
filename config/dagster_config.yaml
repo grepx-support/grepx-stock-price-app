@@ -6,7 +6,7 @@ app:
 
 dagster:
   module_name: "stock_data_app"
-  home: "~/.dagster"  # Can be overridden with DAGSTER_HOME environment variable
+  home: "${PROJECT_ROOT}/dagster_home"  # Can be overridden with DAGSTER_HOME environment variable
 
 storage:
   backend: "sqlite"

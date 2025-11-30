@@ -3,10 +3,10 @@
 import os
 
 import yaml
-from dagster import Definitions, FilesystemIOManager
+from dagster import Definitions, fs_io_manager, FilesystemIOManager, in_process_executor
 
 # Load configuration
-config_path = os.path.join(os.path.dirname(__file__), "config", "dagster_config.yaml")
+config_path = os.path.join(os.path.dirname(__file__), "..", "config", "dagster_config.yaml")
 with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
@@ -18,10 +18,13 @@ dagster_config = config.get("dagster", {})
 storage_config = config.get("storage", {})
 
 # Setup storage path - check environment variable first, then config
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 dagster_home = os.environ.get(
     "DAGSTER_HOME",
-    os.path.expanduser(dagster_config.get("home", "~/.dagster"))
+    os.path.join(PROJECT_ROOT, "dagster_home")  # fallback
 )
+
 
 # Get storage path from config or use default
 storage_path_config = storage_config.get("sqlite_path", None)
@@ -41,11 +44,12 @@ if storage_dir:
     os.makedirs(storage_dir, exist_ok=True)
 
 # Create IOManager
-io_manager = FilesystemIOManager(base_dir=dagster_home)
+# io_manager = FilesystemIOManager(base_dir=dagster_home)
 
 # Create Definitions
 defs = Definitions(
     assets=[close_price_download],
-    resources={"io_manager": io_manager},
+    resources={"io_manager": fs_io_manager},
+    executor=in_process_executor,
 )
 

@@ -13,7 +13,7 @@ if [ -d "venv" ]; then
 fi
 
 echo "Creating virtual environment..."
-python -m venv venv || python -m venv venv
+python3.12 -m venv venv || python -m venv venv
 
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || uname -s | grep -qi "MINGW\|MSYS\|CYGWIN"; then
     PIP="venv/Scripts/pip"
