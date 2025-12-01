@@ -8,7 +8,8 @@ dagit
 dagster-postgres
 omegaconf
 
-# celery_framework and dagster_framework are installed via orchestrator.sh
+# celery_framework, dagster_framework, and py-mongo-libs are installed via orchestrator.sh
 -e ../../libs/celery_framework
 -e ../../libs/dagster_framework
+-e ../../libs/py-mongo-libs
 

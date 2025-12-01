@@ -26,13 +26,13 @@ fi
 export DAGSTER_HOME="$(pwd)/dagster_home"
 
 if [ ! -d "$DAGSTER_HOME" ]; then
-    echo "📁 Creating DAGSTER_HOME at $DAGSTER_HOME"
+    echo "Creating DAGSTER_HOME at $DAGSTER_HOME"
     mkdir -p "$DAGSTER_HOME"
 fi
 
 # Create dagster.yaml only if missing
 if [ ! -f "$DAGSTER_HOME/dagster.yaml" ]; then
-    echo "📝 Creating dagster.yaml"
+    echo "Creating dagster.yaml"
     cat > "$DAGSTER_HOME/dagster.yaml" <<EOF
 local_artifact_storage:
   module: dagster.core.storage.root
@@ -55,29 +55,27 @@ telemetry:
 EOF
 fi
 
-# -----------------------------
-#  Start Redis if not running
-# -----------------------------
+# Check Redis status
 echo "Checking Redis status..."
-
-if lsof -i :6379 >/dev/null 2>&1; then
-    echo "✔ Redis already running on port 6379"
+if lsof -i :6379 >/dev/null 2>&1 || docker ps 2>/dev/null | grep -q ':6379'; then
+    echo "Redis is running"
 else
-    echo "❌ Redis not running — starting Redis..."
+    echo "ERROR: Redis not running on port 6379"
+    exit 1
+fi
 
-    if command -v brew >/dev/null 2>&1; then
-        # macOS via Homebrew
-        brew services start redis || redis-server --daemonize yes
-    elif command -v redis-server >/dev/null 2>&1; then
-        # Linux / Windows (manual)
-        redis-server --daemonize yes
+# Check MongoDB status
+echo "Checking MongoDB status..."
+if docker ps 2>/dev/null | grep -q 'mongo'; then
+    if docker exec mongodb mongosh --authenticationDatabase admin -u admin -p password123 --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+        echo "MongoDB is running and authenticated"
     else
-        echo "❌ Redis is not installed. Install redis first."
+        echo "ERROR: MongoDB authentication failed"
         exit 1
     fi
-
-    sleep 2
-    echo "✔ Redis started"
+else
+    echo "ERROR: MongoDB container not found"
+    exit 1
 fi
 
 # -----------------------------
@@ -86,6 +84,14 @@ fi
 echo "Starting services..."
 
 export PYTHONPATH="$(pwd)/.."
+
+echo "Killing any existing processes on ports 3000, 5555..."
+lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null || true
+lsof -ti:5555 2>/dev/null | xargs kill -9 2>/dev/null || true
+sleep 3
+
+echo "Cleaning up Dagster home..."
+rm -rf dagster_home/.dagster/runs 2>/dev/null || true
 
 echo "Starting Celery worker..."
 $CELERY -A price_app.app.celery_framework_app worker --loglevel=info &

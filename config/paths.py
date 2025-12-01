@@ -17,6 +17,7 @@ PRICE_APP = ROOT / "price_app"
 # --- Configs ---
 CELERY_CONFIG = PRICE_APP / "config" / "celery_config.yaml"
 DAGSTER_CONFIG = PRICE_APP / "config" / "dagster_config.yaml"
+DATABASE_CONFIG = PRICE_APP / "config" / "database_config.yaml"
 
 __all__ = [
     "ROOT",
@@ -24,5 +25,6 @@ __all__ = [
     "LIBS",
     "CELERY_CONFIG",
     "DAGSTER_CONFIG",
+    "DATABASE_CONFIG",
     "DAGSTER_HOME",
 ]

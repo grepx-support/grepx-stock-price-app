@@ -1,0 +1,8 @@
+mongodb:
+  host: localhost
+  port: 27017
+  database: stock_analysis
+  username: admin
+  password: password123
+  collection: stock_prices
+  auth_source: admin
