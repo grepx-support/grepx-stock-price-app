@@ -27,6 +27,7 @@ task:
 
 tasks:
   modules:
-    - "tasks.download_tasks"
+    - "tasks.fetch_store_prices"
+    - "tasks.calculate_store_indicators"
   directories: []
 

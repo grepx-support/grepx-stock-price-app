@@ -1,43 +1,43 @@
-"""Dagster asset for close price download orchestration."""
-
-from dagster import asset
+from dagster import asset, Failure
 from omegaconf import OmegaConf
-from price_app.config.paths import DAGSTER_CONFIG
+from config.paths import DAGSTER_CONFIG
 from app.celery_framework_app import app as celery_app
-from db.MongoDBManager import MongoDBManager
+import logging
 
+logger = logging.getLogger(__name__)
 
 _cfg = OmegaConf.load(DAGSTER_CONFIG)
+conf = _cfg.assets.config.price_ingestion
 
-SYMBOLS = _cfg.assets.config.close_price_download.symbols
-TASK_NAME = _cfg.assets.config.close_price_download.celery_task
-TIMEOUT = _cfg.assets.config.close_price_download.timeout
+SYMBOLS = conf.symbols
+START = conf.start_date
+END = conf.end_date
+SOURCE = conf.source
+TASK_NAME = conf.celery_task
+TIMEOUT = conf.timeout
 
 
 @asset(group_name="stock_data")
-def close_price_download():
-    """Trigger Celery tasks and store results in MongoDB."""
+def price_ingestion():
+    """Submit multi-source ingestion tasks to Celery."""
     results = []
 
-    print(f"Starting close_price_download asset")
-    print(f"SYMBOLS: {list(SYMBOLS)}")
-    print(f"TASK_NAME: {TASK_NAME}")
-    print(f"TIMEOUT: {TIMEOUT}")
-
     for symbol in SYMBOLS:
-        print(f"Sending task for symbol: {symbol}")
-        task = celery_app.send_task(TASK_NAME, args=[symbol])
-        print(f"Task sent with ID: {task.id}")
+        print(f"Submitting ingestion task for {symbol} from {SOURCE}")
+
+        task = celery_app.send_task(
+            TASK_NAME,
+            args=[symbol, START, END, SOURCE]
+        )
         result = task.get(TIMEOUT)
-        print(f"Result received for {symbol}: {result}")
+        if result["status"] != "success":
+            logger.warning(f"Celery task failed for {symbol}: {result}")
+        else:
+            logger.info(f"Celery task succeeded for {symbol}: {result}")
+
         results.append(result)
 
-    print(f"All tasks completed. Total results: {len(results)}")
-    stored = MongoDBManager.get_prices()
-    print(f"Stored records in DB: {len(stored)}")
-
     return {
-        "downloaded": len(results),
-        "stored_count": len(stored),
-        "data": results,
+        "total_symbols": len(SYMBOLS),
+        "results": results
     }

@@ -1,0 +1,52 @@
+{
+    "status": "completed",
+    "total_symbols": 3,
+    "indicators_per_symbol": 6,
+    "successful_symbols": 3,
+    "failed_symbols": 0,
+    "total_indicator_collections": 18,
+    "results": [
+        {
+            "symbol": "AAPL",
+            "indicators_calculated": [
+                "ATR",
+                "BOLLINGER",
+                "EMA",
+                "SMA",
+                "MACD",
+                "RSI"
+            ],
+            "count": 6,
+            "status": "success",
+            "errors": null
+        },
+        {
+            "symbol": "TCS.NS",
+            "indicators_calculated": [
+                "ATR",
+                "BOLLINGER",
+                "EMA",
+                "SMA",
+                "MACD",
+                "RSI"
+            ],
+            "count": 6,
+            "status": "success",
+            "errors": null
+        },
+        {
+            "symbol": "RELIANCE.NS",
+            "indicators_calculated": [
+                "ATR",
+                "BOLLINGER",
+                "EMA",
+                "SMA",
+                "MACD",
+                "RSI"
+            ],
+            "count": 6,
+            "status": "success",
+            "errors": null
+        }
+    ]
+}

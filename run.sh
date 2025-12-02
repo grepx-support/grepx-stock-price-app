@@ -64,18 +64,48 @@ else
     exit 1
 fi
 
-# Check MongoDB status
+###############################################
+#          CHECK / START MONGODB
+###############################################
 echo "Checking MongoDB status..."
-if docker ps 2>/dev/null | grep -q 'mongo'; then
-    if docker exec mongodb mongosh --authenticationDatabase admin -u admin -p password123 --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
-        echo "MongoDB is running and authenticated"
+
+# 1. Check if MongoDB is running on localhost:27017 (local install)
+if lsof -i :27017 >/dev/null 2>&1; then
+    echo "✔ MongoDB already running on localhost:27017"
+else
+    # 2. Check if a Docker MongoDB container already exists
+    if docker ps -a --format "{{.Names}}" | grep -q "^mongodb$"; then
+        echo "✔ MongoDB container exists"
+
+        # Start it if stopped
+        if ! docker ps --format "{{.Names}}" | grep -q "^mongodb$"; then
+            echo "Starting existing mongodb container..."
+            docker start mongodb >/dev/null
+            sleep 3
+        fi
     else
-        echo "ERROR: MongoDB authentication failed"
+        # 3. Create new MongoDB container
+        echo "No MongoDB found — creating new Docker MongoDB container..."
+
+        docker run -d \
+          --name mongodb \
+          -p 27017:27017 \
+          -e MONGO_INITDB_ROOT_USERNAME=admin \
+          -e MONGO_INITDB_ROOT_PASSWORD=password123 \
+          mongo:6
+
+        echo "✔ MongoDB container created"
+        sleep 5
+    fi
+
+    # 4. Verify authentication
+    echo "Validating MongoDB authentication..."
+    if docker exec mongodb mongosh --authenticationDatabase admin -u admin -p password123 --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+        echo "✔ MongoDB is running and authenticated"
+    else
+        echo "MongoDB authentication failed"
         exit 1
     fi
-else
-    echo "ERROR: MongoDB container not found"
-    exit 1
 fi
 
 # -----------------------------
@@ -83,7 +113,8 @@ fi
 # -----------------------------
 echo "Starting services..."
 
-export PYTHONPATH="$(pwd)/.."
+export PYTHONPATH="$(pwd)"
+
 
 echo "Killing any existing processes on ports 3000, 5555..."
 lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null || true
@@ -93,16 +124,19 @@ sleep 3
 echo "Cleaning up Dagster home..."
 rm -rf dagster_home/.dagster/runs 2>/dev/null || true
 
+# PROJECT_ROOT=$(pwd)
+# export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+
 echo "Starting Celery worker..."
-$CELERY -A price_app.app.celery_framework_app worker --loglevel=info &
+$CELERY -A app.celery_framework_app worker --loglevel=info &
 CELERY_PID=$!
 
 echo "Starting Flower..."
-$CELERY -A price_app.app.celery_framework_app flower --port=5555 &
+$CELERY -A app.celery_framework_app flower --port=5555 &
 FLOWER_PID=$!
 
 echo "Starting Dagster..."
-$PYTHON -m dagster dev -m price_app.app.dagster_framework_app --port 3000 > dagster.log 2>&1 &
+$PYTHON -m dagster dev -m app.dagster_framework_app --port 3000 > dagster.log 2>&1 &
 DAGSTER_PID=$!
 
 # -----------------------------

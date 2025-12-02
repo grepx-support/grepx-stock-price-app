@@ -7,7 +7,11 @@ flower
 dagit
 dagster-postgres
 omegaconf
-
+yfinance
+nsepython
+pymongo
+pandas
+requests
 # celery_framework, dagster_framework, and py-mongo-libs are installed via orchestrator.sh
 -e ../../libs/celery_framework
 -e ../../libs/dagster_framework

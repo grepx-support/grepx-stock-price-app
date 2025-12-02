@@ -6,11 +6,11 @@ app:
 
 dagster:
   module_name: "stock_data_app"
-  home: ${oc.env:PROJECT_ROOT}/dagster_home # Can be overridden with DAGSTER_HOME environment variable
+  home: ${oc.env:PROJECT_ROOT}/dagster_home
 
 storage:
   backend: "sqlite"
-  sqlite_path: ""  # Empty = use dagster.home/storage.db, or set custom path
+  sqlite_path: ""
 
 executor:
   type: "in_process"
@@ -27,23 +27,36 @@ sensors:
 assets:
   modules:
     - "assets.stock_assets"
+    - "assets.indicator_assets"
   directories: []
   config:
-    close_price_download:
-      symbols:
-        - "AAPL"
-        - "GOOGL"
-        - "MSFT"
-        - "TSLA"
-      celery_task: "tasks.download_close_price"
-      timeout: 60  # seconds
+    price_ingestion:
+      symbols: ["AAPL", "TCS.NS", "RELIANCE.NS"]
+      start_date: "2021-01-01"
+      end_date: null
+      source: "yahoo_finance"   
+      celery_task: "tasks.fetch_store_prices"
+      timeout: 60
 
 jobs:
-  - name: "download_job"
+  - name: "price_job"
     assets:
-      - "close_price_download"
-  - name: "all_assets_job"
+      - "price_ingestion"
+    description: "Fetch and store prices"
+  
+  - name: "indicators_job"
+    assets:
+      - "atr_indicator"
+      - "ema_indicator"
+      - "sma_indicator"
+      - "bollinger_indicator"
+      - "macd_indicator"
+      - "rsi_indicator"
+    description: "Calculate all technical indicators"
+  
+  - name: "full_pipeline_job"
     assets: "__all__"
+    description: "Full pipeline: prices + all indicators"
 
 ops:
   modules: []
@@ -52,4 +65,3 @@ ops:
 resources:
   default_resources: true
   custom_resources: []
-

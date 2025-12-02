@@ -1,6 +1,6 @@
 from omegaconf import OmegaConf
 from celery_framework import create_app
-from price_app.config.paths import CELERY_CONFIG
+from config.paths import CELERY_CONFIG
 
 # Load YAML config
 cfg = OmegaConf.load(CELERY_CONFIG)

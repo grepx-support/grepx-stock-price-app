@@ -4,7 +4,7 @@ Auto-loads assets/ops from dagster_config.yaml only.
 """
 from dagster_framework.main import create_app
 
-from price_app.config.paths import DAGSTER_CONFIG, ROOT
+from config.paths import DAGSTER_CONFIG, ROOT
 import os
 
 os.environ["PROJECT_ROOT"] = str(ROOT)

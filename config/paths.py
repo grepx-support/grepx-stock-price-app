@@ -26,5 +26,4 @@ __all__ = [
     "CELERY_CONFIG",
     "DAGSTER_CONFIG",
     "DATABASE_CONFIG",
-    "DAGSTER_HOME",
 ]
