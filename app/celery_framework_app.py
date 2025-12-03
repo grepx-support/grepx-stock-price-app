@@ -12,3 +12,6 @@ app = celery_framework_app.app
 
 # For debugging
 print("Loaded tasks:", celery_framework_app.list_tasks())
+
+# Import tasks to register them with Celery
+import tasks

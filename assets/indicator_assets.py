@@ -6,6 +6,10 @@ from omegaconf import OmegaConf
 
 logger = logging.getLogger(__name__)
 
+# Initialize MongoDB connection
+# MongoDBConnection.connect()
+# MongoDBManager.create_indexes()
+
 
 def get_indicator_config(indicator_name: str):
     cfg = OmegaConf.load(DAGSTER_CONFIG)

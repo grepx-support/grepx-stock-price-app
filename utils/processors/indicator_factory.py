@@ -1,19 +1,8 @@
 """Factory utility for creating indicator instances."""
 import logging
-from config.indicators_config import INDICATORS_CONFIG, ENABLED_INDICATORS
-from factors import ATR, EMA, SMA, BOLLINGER, MACD, RSI
+from config.indicators_config import INDICATORS_CONFIG, ENABLED_INDICATORS, INDICATOR_CLASSES
 
 logger = logging.getLogger(__name__)
-
-
-INDICATOR_CLASSES = {
-    "ATR": ATR,
-    "EMA": EMA,
-    "SMA": SMA,
-    "BOLLINGER": BOLLINGER,
-    "MACD": MACD,
-    "RSI": RSI,
-}
 
 
 def create_indicator(indicator_name: str, symbol: str) -> object:

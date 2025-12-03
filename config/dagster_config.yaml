@@ -31,10 +31,10 @@ assets:
   directories: []
   config:
     price_ingestion:
-      symbols: ["AAPL", "TCS.NS", "RELIANCE.NS"]
+      symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "TCS.NS", "RELIANCE.NS"]
       start_date: "2020-11-01"
       end_date: null
-      source: "yahoo_finance"   
+      source: "yahoo_finance"
       celery_task: "tasks.fetch_store_prices"
       timeout: 60
     atr_indicator:

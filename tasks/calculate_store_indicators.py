@@ -1,17 +1,18 @@
 """Task to calculate and store technical indicators."""
 from celery_framework.tasks.decorators import task
 import logging
-import pandas as pd
 
 from db.MongoDBConnection import MongoDBConnection
 from db.MongoDBManager import MongoDBManager
-from utils.indicator_processor import process_indicators_for_symbol
-from utils.indicator_storage import store_indicators
-from utils import clean_symbol
+from utils.processors.indicator_processor import process_indicators_for_symbol
+from utils.storage.indicator_storage import store_indicators
+from utils.loaders.cleaners import clean_symbol
+from utils.helpers import fetch_collection_as_dataframe
 
 logger = logging.getLogger(__name__)
 
 MongoDBConnection.connect()
+MongoDBManager.create_indexes()
 
 
 @task(name="tasks.calculate_store_indicators")
@@ -31,14 +32,14 @@ def calculate_store_indicators(
     try:
         logger.info(f"[Celery] Calculating {indicator_name} for {symbol}")
 
-        # Get price data from MongoDB
+        # Get price data from MongoDB as Polars DataFrame
         clean = clean_symbol(symbol)
         price_collection = f"{clean}_prices"
 
         logger.debug(f"Fetching prices from {price_collection}")
-        prices = MongoDBManager.find_all(price_collection)
+        price_df = fetch_collection_as_dataframe(price_collection, lazy=False)
 
-        if not prices:
+        if price_df.is_empty():
             logger.warning(f"No price data found for {symbol}")
             return {
                 "status": "no_data",
@@ -46,15 +47,11 @@ def calculate_store_indicators(
                 "indicator": indicator_name
             }
 
-        # Convert to DataFrame
-        price_df = pd.DataFrame(prices)
-        logger.debug(f"Loaded {len(price_df)} price records")
-
         # Process SINGLE indicator
         indicator_results = process_indicators_for_symbol(
             symbol,
             price_df,
-            source=source,
+            # source=source,
             indicators=[indicator_name]  # Pass as list
         )
 

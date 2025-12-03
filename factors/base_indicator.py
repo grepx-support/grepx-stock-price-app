@@ -2,7 +2,7 @@
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-import pandas as pd
+from dagster_framework.converters import dataframe_operations
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class BaseIndicator(ABC):
         self.config = config
         self.logger = logging.getLogger(f"{__name__}.{indicator_name}")
 
-    def validate_data(self, df: pd.DataFrame) -> bool:
+    def validate_data(self, df) -> bool:
         """Validate if data meets minimum requirements."""
         try:
             required_columns = self.config.get("required_columns", [])
@@ -51,16 +51,16 @@ class BaseIndicator(ABC):
             return False
 
     @abstractmethod
-    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+    def calculate(self, df):
         """Calculate indicator values. Must be implemented by subclasses."""
         pass
 
-    def _add_metadata(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _add_metadata(self, df):
         """Add metadata columns to result."""
         try:
-            df["symbol"] = self.symbol
-            df["indicator"] = self.indicator_name
-            df["fetched_at"] = datetime.now().isoformat()
+            df = dataframe_operations.add_column(df, "symbol", self.symbol)
+            df = dataframe_operations.add_column(df, "indicator", self.indicator_name)
+            df = dataframe_operations.add_column(df, "fetched_at", datetime.now().isoformat())
             return df
         except Exception as e:
             self.logger.error(f"Failed to add metadata: {str(e)}", exc_info=True)
@@ -83,7 +83,7 @@ class BaseIndicator(ABC):
             self.logger.error(f"Failed to generate collection name: {str(e)}", exc_info=True)
             raise
 
-    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+    def process(self, df):
         """Main processing pipeline."""
         try:
             self.logger.info(f"Processing {self.indicator_name} for {self.symbol}")

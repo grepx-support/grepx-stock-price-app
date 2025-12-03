@@ -1,4 +1,5 @@
 """Configuration for technical indicators."""
+from factors import ATR, EMA, SMA, BOLLINGER, MACD, RSI
 
 INDICATORS_CONFIG = {
     "ATR": {
@@ -44,3 +45,13 @@ INDICATORS_CONFIG = {
 
 # Feature flags for indicators
 ENABLED_INDICATORS = ["ATR", "BOLLINGER", "EMA", "SMA", "MACD", "RSI"]
+
+# Mapping of indicator names to their implementation classes
+INDICATOR_CLASSES = {
+    "ATR": ATR,
+    "EMA": EMA,
+    "SMA": SMA,
+    "BOLLINGER": BOLLINGER,
+    "MACD": MACD,
+    "RSI": RSI,
+}

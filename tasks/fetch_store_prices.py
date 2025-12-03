@@ -1,10 +1,14 @@
 from celery_framework.tasks.decorators import task
 import logging
-import pandas as pd
 
 from db.MongoDBConnection import MongoDBConnection
 from db.MongoDBManager import MongoDBManager
-from utils import load_data_source, fetch_price_data, get_collection_name, clean_rows
+from utils.loaders.loaders import load_data_source
+from utils.loaders.fetchers import fetch_price_data
+from utils.loaders.cleaners import clean_rows, get_collection_name
+from utils.helpers import store_dataframe_to_collection
+from dagster_framework import PolarsConverter
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,30 +31,29 @@ def fetch_store_prices(symbol: str, start_date: str, end_date: str | None, sourc
         return {"status": "error", "symbol": symbol}
 
     # Fetch data
-    df: pd.DataFrame = fetch_price_data(api, symbol, start_date, end_date)
+    pandas_df = fetch_price_data(api, symbol, start_date, end_date)
 
-    if df.empty:
+    if pandas_df.empty:
         logger.warning(f"No data returned for {symbol}")
         return {"status": "no_data", "symbol": symbol}
 
+    # Convert to Polars using framework converter
+    df = PolarsConverter.from_pandas(pandas_df)
+
+    # Clean rows
+    rows = PolarsConverter.to_records(df)
+    cleaned_rows = clean_rows(rows, symbol, source)
+    df_cleaned = PolarsConverter.from_records(cleaned_rows)
+
     # Store in MongoDB
     collection = get_collection_name(symbol)
-    logger.info(f"Storing rows in collection: {collection}")
+    logger.info(f"Storing {len(df_cleaned)} rows to {collection}")
 
-    rows = df.to_dict("records")
-    cleaned_rows = clean_rows(rows, symbol, source)
-    success = MongoDBManager.bulk_upsert(collection, cleaned_rows)
-    if not success:
-        logger.error(f"Failed to store data for {symbol}")
-        return {
-            "status": "error",
-            "symbol": symbol,
-            "error": "DB write failed"
-            }
+    inserted = store_dataframe_to_collection(df_cleaned, collection)
 
     return {
-        "status": "success" if success else "error",
+        "status": "success" if inserted > 0 else "error",
         "symbol": symbol,
-        "rows": len(rows),
+        "rows": inserted,
         "collection": collection
     }

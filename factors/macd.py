@@ -1,6 +1,6 @@
 """MACD (Moving Average Convergence Divergence) indicator."""
 import logging
-import pandas as pd
+from dagster_framework.converters import dataframe_operations, series_operations
 from .base_indicator import BaseIndicator
 
 logger = logging.getLogger(__name__)
@@ -12,10 +12,10 @@ class MACD(BaseIndicator):
     def __init__(self, symbol: str, config: dict):
         super().__init__(symbol, "MACD", config)
 
-    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+    def calculate(self, df):
         """Calculate MACD."""
         try:
-            result = df.copy()
+            result = dataframe_operations.clone_dataframe(df)
             fast = self.config.get("fast_period", 12)
             slow = self.config.get("slow_period", 26)
             signal = self.config.get("signal_period", 9)
@@ -23,21 +23,24 @@ class MACD(BaseIndicator):
             logger.info(f"Calculating MACD ({fast}, {slow}, {signal})")
 
             # Calculate MACD line
-            ema_fast = result["close"].ewm(span=fast, adjust=False).mean()
-            ema_slow = result["close"].ewm(span=slow, adjust=False).mean()
-            result["macd"] = ema_fast - ema_slow
+            ema_fast = series_operations.exponential_weighted_mean(result["close"], span=fast, adjust=False)
+            ema_slow = series_operations.exponential_weighted_mean(result["close"], span=slow, adjust=False)
+            macd_line = ema_fast - ema_slow
+            result = result.with_columns(macd_line.alias("macd"))
 
             # Calculate Signal line
-            result["macd_signal"] = result["macd"].ewm(span=signal, adjust=False).mean()
+            macd_signal = series_operations.exponential_weighted_mean(result["macd"], span=signal, adjust=False)
+            result = result.with_columns(macd_signal.alias("macd_signal"))
 
             # Calculate Histogram
-            result["macd_histogram"] = result["macd"] - result["macd_signal"]
+            histogram = result["macd"] - result["macd_signal"]
+            result = result.with_columns(histogram.alias("macd_histogram"))
 
             logger.debug("MACD components calculated")
 
             # Keep only necessary columns
             keep_cols = ["date", "macd", "macd_signal", "macd_histogram"]
-            result = result[[col for col in keep_cols if col in result.columns]]
+            result = dataframe_operations.select_columns(result, keep_cols)
 
             logger.info(f"MACD calculation completed")
             return result
