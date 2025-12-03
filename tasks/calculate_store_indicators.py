@@ -51,7 +51,7 @@ def calculate_store_indicators(
         indicator_results = process_indicators_for_symbol(
             symbol,
             price_df,
-            # source=source,
+            source=source,
             indicators=[indicator_name]  # Pass as list
         )
 

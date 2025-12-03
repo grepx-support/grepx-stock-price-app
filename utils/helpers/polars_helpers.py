@@ -57,7 +57,7 @@ def store_dataframe_to_collection(
         df = df.collect()
 
     records = PolarsConverter.to_records(df)
-    inserted_count = MongoDBManager.bulk_insert(collection, records)
+    inserted_count = MongoDBManager.bulk_upsert(collection, records)
 
     logger.info(f"Stored {inserted_count} rows to {collection}")
     return inserted_count

@@ -12,6 +12,7 @@ nsepython
 pymongo
 pandas
 requests
+polars
 # celery_framework, dagster_framework, and py-mongo-libs are installed via orchestrator.sh
 -e ../../libs/celery_framework
 -e ../../libs/dagster_framework

@@ -36,7 +36,7 @@ def store_indicators(indicator_results: dict, symbol: str, source: str):
                 records = result_df.to_dicts()
 
                 # Store
-                success = MongoDBManager.bulk_insert(collection, records)
+                success = MongoDBManager.bulk_upsert_indicators(collection, records)
 
                 if success:
                     logger.info(

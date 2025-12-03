@@ -2,12 +2,13 @@
 import logging
 from typing import Any
 from utils.processors.indicator_factory import create_indicator
+from dagster_framework.converters import dataframe_operations
 
 logger = logging.getLogger(__name__)
 
 
 def process_indicators_for_symbol(
-    symbol: str, price_df: Any, indicators: list = None
+    symbol: str, price_df: Any, source: str, indicators: list = None
 ) -> dict:
     """
     Process multiple indicators for a symbol.
@@ -36,7 +37,10 @@ def process_indicators_for_symbol(
 
                 indicator = create_indicator(indicator_name, symbol)
                 result_df = indicator.process(price_df)
-
+                result_df = dataframe_operations.add_column(result_df, "source", source)
+                if result_df is None or result_df.is_empty():
+                    logger.warning(f"{indicator_name} returned empty df")
+                    continue
                 results[indicator_name] = result_df
                 logger.info(f"Successfully processed {indicator_name} for {symbol}")
 
