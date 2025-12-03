@@ -39,5 +39,6 @@ def price_ingestion():
 
     return {
         "total_symbols": len(SYMBOLS),
-        "results": results
+        "results": results,
+        "source": SOURCE
     }

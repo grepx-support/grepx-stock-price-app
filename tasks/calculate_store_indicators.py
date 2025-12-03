@@ -16,18 +16,20 @@ MongoDBConnection.connect()
 
 @task(name="tasks.calculate_store_indicators")
 def calculate_store_indicators(
-    symbol: str, source: str = "default", indicators: list = None
+    symbol: str,
+    indicator_name: str,
+    source: str,
 ):
     """
-    Calculate and store technical indicators for a symbol.
+    Calculate and store ONE indicator for a symbol.
     
     Args:
         symbol: Stock ticker symbol
+        indicator_name: Single indicator name (ATR, EMA, SMA, etc.)
         source: Data source name
-        indicators: List of indicator names. If None, uses all enabled indicators.
     """
     try:
-        logger.info(f"[Celery] Calculating indicators for {symbol}")
+        logger.info(f"[Celery] Calculating {indicator_name} for {symbol}")
 
         # Get price data from MongoDB
         clean = clean_symbol(symbol)
@@ -38,27 +40,61 @@ def calculate_store_indicators(
 
         if not prices:
             logger.warning(f"No price data found for {symbol}")
-            return {"status": "no_data", "symbol": symbol}
+            return {
+                "status": "no_data",
+                "symbol": symbol,
+                "indicator": indicator_name
+            }
 
         # Convert to DataFrame
         price_df = pd.DataFrame(prices)
+        logger.debug(f"Loaded {len(price_df)} price records")
 
-        # Process indicators
-        indicator_results = process_indicators_for_symbol(symbol, price_df, indicators)
+        # Process SINGLE indicator
+        indicator_results = process_indicators_for_symbol(
+            symbol,
+            price_df,
+            source=source,
+            indicators=[indicator_name]  # Pass as list
+        )
 
         if not indicator_results:
-            logger.error(f"No indicators processed for {symbol}")
-            return {"status": "error", "symbol": symbol, "error": "No indicators processed"}
+            logger.error(f"No {indicator_name} processed for {symbol}")
+            return {
+                "status": "error",
+                "symbol": symbol,
+                "indicator": indicator_name,
+                "error": "No indicators processed"
+            }
 
-        # Store indicators
-        store_indicators(indicator_results, symbol, source)
+        # Store indicator
+        write_success = store_indicators(indicator_results, symbol, source)
+        if not write_success:
+            logger.error(f"Failed to store {indicator_name} for {symbol}")
+            return {
+            "status": "error",
+            "symbol": symbol,
+            "indicator": indicator_name,
+            "error": "DB write failed"
+            }
+        
+        rows = len(indicator_results.get(indicator_name, []))
+
+        logger.info(f"✓ {indicator_name} stored for {symbol} ({rows} rows)")
 
         return {
             "status": "success",
             "symbol": symbol,
-            "indicators_calculated": list(indicator_results.keys()),
+            "indicator": indicator_name,
+            "rows": rows,
+            "collection": f"{clean}_{indicator_name.lower()}"
         }
 
     except Exception as e:
-        logger.error(f"Failed to calculate indicators for {symbol}", exc_info=True)
-        return {"status": "error", "symbol": symbol, "error": str(e)}
+        logger.error(f"Failed: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "symbol": symbol,
+            "indicator": indicator_name,
+            "error": str(e)
+        }

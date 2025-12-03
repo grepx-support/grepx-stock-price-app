@@ -32,11 +32,29 @@ assets:
   config:
     price_ingestion:
       symbols: ["AAPL", "TCS.NS", "RELIANCE.NS"]
-      start_date: "2021-01-01"
+      start_date: "2020-11-01"
       end_date: null
       source: "yahoo_finance"   
       celery_task: "tasks.fetch_store_prices"
       timeout: 60
+    atr_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    ema_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    sma_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    bollinger_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    macd_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    rsi_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
 
 jobs:
   - name: "price_job"

@@ -60,8 +60,8 @@ echo "Checking Redis status..."
 if lsof -i :6379 >/dev/null 2>&1 || docker ps 2>/dev/null | grep -q ':6379'; then
     echo "Redis is running"
 else
-    echo "ERROR: Redis not running on port 6379"
-    exit 1
+    brew services start redis
+    echo "Redis Running"
 fi
 
 ###############################################
@@ -128,7 +128,7 @@ rm -rf dagster_home/.dagster/runs 2>/dev/null || true
 # export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 echo "Starting Celery worker..."
-$CELERY -A app.celery_framework_app worker --loglevel=info &
+$CELERY -A app.celery_framework_app worker  --loglevel=info &
 CELERY_PID=$!
 
 echo "Starting Flower..."

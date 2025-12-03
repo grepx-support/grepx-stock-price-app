@@ -39,7 +39,14 @@ def fetch_store_prices(symbol: str, start_date: str, end_date: str | None, sourc
 
     rows = df.to_dict("records")
     cleaned_rows = clean_rows(rows, symbol, source)
-    success = MongoDBManager.bulk_insert(collection, cleaned_rows)
+    success = MongoDBManager.bulk_upsert(collection, cleaned_rows)
+    if not success:
+        logger.error(f"Failed to store data for {symbol}")
+        return {
+            "status": "error",
+            "symbol": symbol,
+            "error": "DB write failed"
+            }
 
     return {
         "status": "success" if success else "error",

@@ -5,6 +5,7 @@ from factors import ATR, EMA, SMA, BOLLINGER, MACD, RSI
 
 logger = logging.getLogger(__name__)
 
+
 INDICATOR_CLASSES = {
     "ATR": ATR,
     "EMA": EMA,

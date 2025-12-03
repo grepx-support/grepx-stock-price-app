@@ -1,7 +1,7 @@
 """Utility to store indicators in database."""
 import logging
 from db.MongoDBManager import MongoDBManager
-from assets.indicator_assets import create_indicator
+from utils.indicator_factory import create_indicator
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ def store_indicators(indicator_results: dict, symbol: str, source: str):
         source: Data source name
     """
     try:
+        all_success = True
         logger.info(f"Storing indicators for {symbol}")
 
         for indicator_name, result_df in indicator_results.items():
@@ -32,16 +33,19 @@ def store_indicators(indicator_results: dict, symbol: str, source: str):
                 records = result_df.to_dict("records")
 
                 # Store
-                success = MongoDBManager.bulk_insert(collection, records)
+                success = MongoDBManager.bulk_upsert_indicators(collection, records)
 
                 if success:
                     logger.info(
                         f"Stored {len(records)} {indicator_name} records in {collection}"
                     )
                 else:
+                    all_success = False
                     logger.error(f"Failed to store {indicator_name} in {collection}")
+                return all_success
 
             except Exception as e:
+                all_success = False
                 logger.error(
                     f"Failed to store {indicator_name}: {str(e)}", exc_info=True
                 )

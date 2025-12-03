@@ -37,4 +37,8 @@ class MongoConfig:
     @classmethod
     def get_connection_uri(cls) -> str:
         """Build MongoDB connection URI."""
-        return f"mongodb://{cls.USERNAME}:{cls.PASSWORD}@{cls.HOST}:{cls.PORT}/{cls.DATABASE}?authSource={cls.AUTH_SOURCE}"
+        return (
+            f"mongodb://{cls.USERNAME}:{cls.PASSWORD}"
+            f"@{cls.HOST}:{cls.PORT}/{cls.DATABASE}"
+            f"?authSource={cls.AUTH_SOURCE}"
+        )
