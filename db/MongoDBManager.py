@@ -169,17 +169,17 @@ class MongoDBManager:
 
     @staticmethod
     def create_indexes():
-        """Create indexes on symbol+date."""
+        """Create indexes on symbol+date for fast duplicate detection during upsert."""
         try:
             conn = MongoDBConnection.get_connection()
             collection = conn.collection(MongoConfig.COLLECTION)
 
             collection.create_index(
-                [("symbol", 1), ("timestamp", 1)],
+                [("symbol", 1), ("date", 1)],
                 unique=True,
-                name="unique_symbol_timestamp"
+                name="unique_symbol_date"
                 )
 
-            logger.info("Indexes created")
+            logger.info("Indexes created: unique index on (symbol, date)")
         except Exception as e:
             logger.warning(f"Index creation failed: {e}")

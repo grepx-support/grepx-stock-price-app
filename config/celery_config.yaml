@@ -15,7 +15,8 @@ celery:
   enable_utc: true
 
 worker:
-  pool: "solo"  # Use "solo" instead "prefork" pool on Windows to avoid billiard issues
+  pool: "solo"  # Use "solo" on Windows to avoid thread pool issues
+  max_concurrent: 10
   prefetch_multiplier: 1
   max_tasks_per_child: 50
 

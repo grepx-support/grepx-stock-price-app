@@ -14,31 +14,37 @@ def _load_db_config():
 
 _cfg = _load_db_config()
 
-HOST = _cfg.host
-PORT = int(_cfg.port)
+# Get connection type (local or atlas)
+CONNECTION_TYPE = _cfg.connection_type
 DATABASE = _cfg.database
-USERNAME = _cfg.username
-PASSWORD = _cfg.password
 COLLECTION = _cfg.collection
-AUTH_SOURCE = _cfg.auth_source
 
 
 class MongoConfig:
     """MongoDB connection configuration."""
 
-    HOST = HOST
-    PORT = PORT
+    CONNECTION_TYPE = CONNECTION_TYPE
     DATABASE = DATABASE
-    USERNAME = USERNAME
-    PASSWORD = PASSWORD
     COLLECTION = COLLECTION
-    AUTH_SOURCE = AUTH_SOURCE
+
+    # Local MongoDB config
+    HOST = _cfg.local.host if CONNECTION_TYPE == "local" else None
+    PORT = int(_cfg.local.port) if CONNECTION_TYPE == "local" else None
+    USERNAME = _cfg.local.username if CONNECTION_TYPE == "local" else None
+    PASSWORD = _cfg.local.password if CONNECTION_TYPE == "local" else None
+    AUTH_SOURCE = _cfg.local.auth_source if CONNECTION_TYPE == "local" else None
+
+    # Atlas MongoDB config
+    ATLAS_CONNECTION_STRING = _cfg.atlas.connection_string if CONNECTION_TYPE == "atlas" else None
 
     @classmethod
     def get_connection_uri(cls) -> str:
-        """Build MongoDB connection URI."""
-        return (
-            f"mongodb://{cls.USERNAME}:{cls.PASSWORD}"
-            f"@{cls.HOST}:{cls.PORT}/{cls.DATABASE}"
-            f"?authSource={cls.AUTH_SOURCE}"
-        )
+        """Build MongoDB connection URI based on connection type."""
+        if cls.CONNECTION_TYPE == "atlas":
+            return cls.ATLAS_CONNECTION_STRING
+        else:  # local
+            return (
+                f"mongodb://{cls.USERNAME}:{cls.PASSWORD}"
+                f"@{cls.HOST}:{cls.PORT}/{cls.DATABASE}"
+                f"?authSource={cls.AUTH_SOURCE}"
+            )
