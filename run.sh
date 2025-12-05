@@ -79,8 +79,8 @@ CELERY="venv/Scripts/celery"
 
 # macOS / Linux detection for venv path
 if [ ! -f "$PYTHON" ]; then
-    PYTHON="venv/bin/python3.12"
-    CELERY="venv/bin/celery"
+    PYTHON="venv/bin/python3"
+    CELERY="venv/bin/python3 -m celery"
 fi
 
 # -----------------------------
@@ -133,7 +133,7 @@ fi
 echo "Checking MongoDB status..."
 
 # Load MongoDB config from YAML (use venv Python)
-read -r MONGO_PORT MONGO_USER MONGO_PASS MONGO_AUTH < <(venv/Scripts/python -c "
+read -r MONGO_PORT MONGO_USER MONGO_PASS MONGO_AUTH < <($PYTHON -c "
 import os
 from omegaconf import OmegaConf
 
