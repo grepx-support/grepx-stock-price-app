@@ -1,6 +1,6 @@
 mongodb:
   # Choose connection type: "local" or "atlas"
-  connection_type: "local"
+  connection_type: "atlas"
 
   # Local MongoDB (Docker)
   local:
