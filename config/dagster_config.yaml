@@ -1,0 +1,98 @@
+# Dagster configuration for stock_data_app
+app:
+  name: "stock_data_app"
+  version: "1.0.0"
+  environment: ${oc.env:APP_ENV,dev}
+
+dagster:
+  module_name: "stock_data_app"
+  home: ${oc.env:PROJECT_ROOT}/dagster_home
+
+  # Server configuration per environment
+  server:
+    host: 0.0.0.0
+
+# Environment-specific port configuration
+environments:
+  dev:
+    dagster_port: 3000
+    flower_port: 5555
+  staging:
+    dagster_port: 8080
+    flower_port: 5556
+
+storage:
+  backend: "sqlite"
+  sqlite_path: ""
+
+executor:
+  type: "in_process"
+  config:
+    max_concurrent: 4
+
+schedules:
+  enabled: true
+  default_timezone: "Asia/Kolkata"
+
+sensors:
+  enabled: true
+
+assets:
+  modules:
+    - "assets.stock_assets"
+    - "assets.indicator_assets"
+  directories: []
+  config:
+    price_ingestion:
+      symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "TCS.NS", "RELIANCE.NS"]
+      start_date: "2020-11-01"
+      end_date: null
+      source: "yahoo_finance"
+      celery_task: "tasks.fetch_store_prices"
+      timeout: 300
+    atr_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    ema_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    sma_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    bollinger_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    macd_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+    rsi_indicator:
+      celery_task: "tasks.calculate_store_indicators"
+      timeout: 120
+
+jobs:
+  - name: "price_job"
+    assets:
+      - "price_ingestion"
+    description: "Fetch and store prices"
+  
+  - name: "indicators_job"
+    assets:
+      - "atr_indicator"
+      - "ema_indicator"
+      - "sma_indicator"
+      - "bollinger_indicator"
+      - "macd_indicator"
+      - "rsi_indicator"
+    description: "Calculate all technical indicators"
+  
+  - name: "full_pipeline_job"
+    assets: "__all__"
+    description: "Full pipeline: prices + all indicators"
+
+ops:
+  modules: []
+  directories: []
+
+resources:
+  default_resources: true
+  custom_resources: []

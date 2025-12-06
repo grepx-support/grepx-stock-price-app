@@ -1,0 +1,23 @@
+mongodb:
+  # Choose connection type: "local" or "atlas"
+  connection_type: "atlas"
+
+  # Local MongoDB (Docker)
+  local:
+    host: localhost
+    port: 27017
+    database: stock_analysis
+    username: admin
+    password: password123
+    collection: stock_prices
+    auth_source: admin
+
+  # MongoDB Atlas Cloud
+  atlas:
+    connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/?appName=grepx"
+    database: stock_analysis
+    collection: stock_prices
+
+  # Default settings (used for both)
+  database: stock_analysis
+  collection: stock_prices
