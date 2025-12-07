@@ -2,7 +2,7 @@
 
 import logging
 from typing import Any
-from db.MongoDBManager import MongoDBManager
+from utils.db_utils import find_all, bulk_upsert
 from dagster_framework import PolarsConverter
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def fetch_collection_as_dataframe(
     Raises:
         ValueError: If collection is empty.
     """
-    documents = MongoDBManager.find_all(collection)
+    documents = find_all(collection)
 
     if not documents:
         raise ValueError(f"No documents found in collection: {collection}")
@@ -57,7 +57,7 @@ def store_dataframe_to_collection(
         df = df.collect()
 
     records = PolarsConverter.to_records(df)
-    inserted_count = MongoDBManager.bulk_upsert(collection, records)
+    inserted_count = bulk_upsert(collection, records)
 
     logger.info(f"Stored {inserted_count} rows to {collection}")
     return inserted_count

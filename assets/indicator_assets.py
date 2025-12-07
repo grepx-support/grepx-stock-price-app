@@ -27,7 +27,7 @@ def create_indicator_asset(indicator_name: str):
     )
     def indicator_asset(price_ingestion):
         try:
-            from app.celery_framework_app import app as celery_app
+            from app.main import app as celery_app
             cfg = get_indicator_config(indicator_name)  
 
             timeout = cfg.get("timeout", 600)

@@ -1,7 +1,7 @@
 from dagster import asset, Failure
 from omegaconf import OmegaConf
 from config.paths import DAGSTER_CONFIG
-from app.celery_framework_app import app as celery_app
+from app.main import app as celery_app
 import logging
 
 logger = logging.getLogger(__name__)

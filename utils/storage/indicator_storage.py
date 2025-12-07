@@ -1,6 +1,6 @@
 """Utility to store indicators in database."""
 import logging
-from db.MongoDBManager import MongoDBManager
+from utils.db_utils import bulk_upsert_indicators
 from utils.processors.indicator_factory import create_indicator
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def store_indicators(indicator_results: dict, symbol: str, source: str):
                 records = result_df.to_dicts()
 
                 # Store
-                success = MongoDBManager.bulk_upsert_indicators(collection, records)
+                success = bulk_upsert_indicators(collection, records)
 
                 if success:
                     logger.info(

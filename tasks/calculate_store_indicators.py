@@ -2,8 +2,7 @@
 from celery_framework.tasks.decorators import task
 import logging
 
-from db.MongoDBConnection import MongoDBConnection
-from db.MongoDBManager import MongoDBManager
+from utils.db_utils import create_indexes
 from utils.processors.indicator_processor import process_indicators_for_symbol
 from utils.storage.indicator_storage import store_indicators
 from utils.loaders.cleaners import clean_symbol
@@ -11,8 +10,8 @@ from utils.helpers import fetch_collection_as_dataframe
 
 logger = logging.getLogger(__name__)
 
-MongoDBConnection.connect()
-MongoDBManager.create_indexes()
+# Initialize MongoDB connection and indexes
+create_indexes()
 
 
 @task(name="tasks.calculate_store_indicators")

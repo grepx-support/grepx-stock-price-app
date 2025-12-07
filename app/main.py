@@ -1,7 +1,7 @@
 # price_app/app/main.py
 
 from config.paths import CELERY_CONFIG, DAGSTER_CONFIG, MONGO_CONFIG, ROOT
-from .loader import AppLoader
+from app.loader import AppLoader
 import os
 
 os.environ["PROJECT_ROOT"] = str(ROOT)
@@ -27,20 +27,8 @@ mongo_app = AppLoader(
     factory=lambda cfg: __import__('mongo_connection', fromlist=['create_app']).create_app(cfg)
 )
 
+# Expose Celery app instance for CLI usage (celery -A app.main worker)
+app = celery_app.instance.app
 
-if __name__ == "__main__":
-    print("="*60)
-    print("Price App Status")
-    print("="*60)
-    try:
-        print(f"Celery: {len(celery_app.list_tasks())} tasks")
-    except Exception as e:
-        print(f"Celery: Error - {e}")
-    
-    try:
-        print(f"MongoDB: {mongo_app.instance.db.name}")
-    except Exception as e:
-        print(f"MongoDB: Error - {e}")
-    
-    print(f"Dagster: Loaded")
-    print("="*60)
+# Expose Dagster definitions for CLI usage (dagster dev -f app.main)
+defs = dagster_app.instance

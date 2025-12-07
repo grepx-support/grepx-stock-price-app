@@ -1,8 +1,7 @@
 from celery_framework.tasks.decorators import task
 import logging
 
-from db.MongoDBConnection import MongoDBConnection
-from db.MongoDBManager import MongoDBManager
+from utils.db_utils import create_indexes
 from utils.loaders.loaders import load_data_source
 from utils.loaders.fetchers import fetch_price_data
 from utils.loaders.cleaners import clean_rows, get_collection_name
@@ -12,8 +11,8 @@ from dagster_framework import PolarsConverter
 
 logger = logging.getLogger(__name__)
 
-MongoDBConnection.connect()
-MongoDBManager.create_indexes()
+# Initialize MongoDB connection and indexes
+create_indexes()
 
 
 @task(name="tasks.fetch_store_prices")

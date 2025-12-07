@@ -28,7 +28,7 @@ class AppLoader:
             self._instance = self.factory(cfg, **self.kwargs)
         else:
             self._instance = self.factory(**self.kwargs)
-        print(f"✓ {self.name} loaded")
+        print(f"{self.name} loaded")
     
     def __getattr__(self, name):
         """Proxy attribute access to instance"""
