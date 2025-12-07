@@ -1,29 +1,34 @@
+# price_app/setup.sh
+
 #!/bin/bash
 set -e
 
 cd "$(dirname "$0")"
+source common.sh
 
-LIBS_DIR="../../libs"
-
-echo "Setting up price_app..."
-
-if [ -d "venv" ]; then
-    echo "Removing existing venv..."
-    rm -rf venv
+if [ ! -d "venv" ]; then
+    PYTHON=$(find_python)
+    $PYTHON -m venv venv
 fi
 
-echo "Creating virtual environment..."
-python3.12 -m venv venv || python -m venv venv
+$VENV_PYTHON -m pip install --upgrade pip
 
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || uname -s | grep -qi "MINGW\|MSYS\|CYGWIN"; then
-    PIP="venv/Scripts/pip"
-else
-    PIP="venv/bin/pip"
+# Install all libs from ../libs
+LIBS_DIR="../libs"
+if [ -d "$LIBS_DIR" ]; then
+    echo "Installing all libraries from $LIBS_DIR..."
+    for lib in "$LIBS_DIR"/*; do
+        if [ -d "$lib" ]; then
+            echo "Installing $(basename $lib)..."
+            $VENV_PIP install -e "$lib"
+        fi
+    done
 fi
 
-echo "Installing requirements..."
-$PIP install -r requirements.txt
+# Install app requirements
+if [ -f "requirements.txt" ]; then
+    echo "Installing app requirements..."
+    $VENV_PIP install -r requirements.txt
+fi
 
-echo ""
-echo "Setup complete!"
-echo "Run: ./run.sh"
+echo "price_app setup complete!"
