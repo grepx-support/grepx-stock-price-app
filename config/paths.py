@@ -1,29 +1,10 @@
+# price_app/config/paths.py
+
 from pathlib import Path
 
-def get_project_root() -> Path:
-    """
-    ALWAYS returns the root directory of the project,
-    whether running locally, in Docker, or on a server.
-    """
-    return Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).parent.parent
+CONFIG_DIR = Path(__file__).parent
 
-
-ROOT = get_project_root()
-
-# --- Module roots ---
-LIBS = ROOT / "libs"
-PRICE_APP = ROOT / "price_app"
-
-# --- Configs ---
-CELERY_CONFIG = PRICE_APP / "config" / "celery_config.yaml"
-DAGSTER_CONFIG = PRICE_APP / "config" / "dagster_config.yaml"
-DATABASE_CONFIG = PRICE_APP / "config" / "database_config.yaml"
-
-__all__ = [
-    "ROOT",
-    "PRICE_APP",
-    "LIBS",
-    "CELERY_CONFIG",
-    "DAGSTER_CONFIG",
-    "DATABASE_CONFIG",
-]
+CELERY_CONFIG = CONFIG_DIR / "celery_config.yaml"
+DAGSTER_CONFIG = CONFIG_DIR / "dagster_config.yaml"
+MONGO_CONFIG = CONFIG_DIR / "database_config.yaml"
