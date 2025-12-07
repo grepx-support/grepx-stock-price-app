@@ -1,0 +1,46 @@
+# Price App Configuration
+
+# App metadata
+app:
+  name: "price_app"
+  version: "1.0.0"
+
+# Celery configuration
+celery:
+  broker_url: "redis://127.0.0.1:6379/0"
+  result_backend: "redis://127.0.0.1:6379/1"
+  task_serializer: "json"
+  result_serializer: "json"
+  accept_content:
+    - json
+  timezone: "Asia/Kolkata"
+  enable_utc: true
+
+worker:
+  pool: "solo"
+  max_concurrent: 10
+
+task:
+  track_started: true
+  time_limit: 1800
+  soft_time_limit: 1500
+
+tasks:
+  modules: []
+  directories: []
+
+# MongoDB configuration
+mongodb:
+  connection_type: "atlas"  # "local" or "atlas"
+  
+  local:
+    host: localhost
+    port: 27017
+    database: stock_analysis
+    username: admin
+    password: password123
+    auth_source: admin
+  
+  atlas:
+    connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/?appName=grepx"
+    database: stock_analysis

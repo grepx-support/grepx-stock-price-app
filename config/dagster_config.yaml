@@ -2,52 +2,17 @@
 app:
   name: "price_app"
   version: "1.0.0"
-  environment: ${oc.env:APP_ENV,dev}
 
 dagster:
   module_name: "price_app"
   home: ${oc.env:PROJECT_ROOT}/dagster_home
 
-  # Server configuration per environment
-  server:
-    host: 0.0.0.0
-
-# Environment-specific port configuration
-environments:
-  dev:
-    dagster_port: 3000
-    flower_port: 5555
-  staging:
-    dagster_port: 8080
-    flower_port: 5556
-
-storage:
-  backend: "sqlite"
-  sqlite_path: ""
-
-executor:
-  type: "in_process"
-  config:
-    max_concurrent: 4
-
-schedules:
-  enabled: true
-  default_timezone: "Asia/Kolkata"
-
-sensors:
-  enabled: true
-
 assets:
   modules: []
   directories: []
-  config: {}
 
 jobs: []
 
 ops:
   modules: []
   directories: []
-
-resources:
-  default_resources: true
-  custom_resources: []

@@ -1,34 +1,28 @@
 # price_app/app/main.py
 
-from config.paths import CELERY_CONFIG, DAGSTER_CONFIG, MONGO_CONFIG, ROOT
-from app.loader import AppLoader
+from pathlib import Path
+from omegaconf import OmegaConf
 import os
+
+# Setup paths
+ROOT = Path(__file__).parent.parent
+CONFIG_DIR = ROOT / "config"
+CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
 os.environ["PROJECT_ROOT"] = str(ROOT)
 
-# Create loaders
-celery_app = AppLoader(
-    name="Celery",
-    config_path=CELERY_CONFIG,
-    factory=lambda cfg: __import__('celery_framework').create_app(cfg)
-)
+# Load config
+config = OmegaConf.load(CONFIG_FILE)
 
-dagster_app = AppLoader(
-    name="Dagster",
-    config_path=None,
-    factory=lambda: __import__('dagster_framework.main', fromlist=['create_app']).create_app(
-        config_path=str(DAGSTER_CONFIG.parent)
-    )
-)
+# Initialize frameworks
+from celery_framework import create_app as create_celery_app
+from mongo_connection import create_app as create_mongo_app
+from dagster_framework.main import create_app as create_dagster_app
 
-mongo_app = AppLoader(
-    name="MongoDB",
-    config_path=MONGO_CONFIG,
-    factory=lambda cfg: __import__('mongo_connection', fromlist=['create_app']).create_app(cfg)
-)
+# Create apps
+_celery_wrapper = create_celery_app(config)
+app = _celery_wrapper.app  # Expose for celery CLI
 
-# Expose Celery app instance for CLI usage (celery -A app.main worker)
-app = celery_app.instance.app
+_mongo_app = create_mongo_app(OmegaConf.create({"mongodb": config.mongodb}))
 
-# Expose Dagster definitions for CLI usage (dagster dev -f app.main)
-defs = dagster_app.instance
+defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file
