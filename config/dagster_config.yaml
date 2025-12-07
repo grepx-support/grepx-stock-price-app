@@ -1,11 +1,11 @@
-# Dagster configuration for stock_data_app
+# Dagster configuration
 app:
-  name: "stock_data_app"
+  name: "price_app"
   version: "1.0.0"
   environment: ${oc.env:APP_ENV,dev}
 
 dagster:
-  module_name: "stock_data_app"
+  module_name: "price_app"
   home: ${oc.env:PROJECT_ROOT}/dagster_home
 
   # Server configuration per environment
@@ -38,56 +38,11 @@ sensors:
   enabled: true
 
 assets:
-  modules:
-    - "assets.stock_assets"
-    - "assets.indicator_assets"
+  modules: []
   directories: []
-  config:
-    price_ingestion:
-      symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "JPM", "TCS.NS", "RELIANCE.NS"]
-      start_date: "2020-11-01"
-      end_date: null
-      source: "yahoo_finance"
-      celery_task: "tasks.fetch_store_prices"
-      timeout: 300
-    atr_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
-    ema_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
-    sma_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
-    bollinger_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
-    macd_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
-    rsi_indicator:
-      celery_task: "tasks.calculate_store_indicators"
-      timeout: 120
+  config: {}
 
-jobs:
-  - name: "price_job"
-    assets:
-      - "price_ingestion"
-    description: "Fetch and store prices"
-  
-  - name: "indicators_job"
-    assets:
-      - "atr_indicator"
-      - "ema_indicator"
-      - "sma_indicator"
-      - "bollinger_indicator"
-      - "macd_indicator"
-      - "rsi_indicator"
-    description: "Calculate all technical indicators"
-  
-  - name: "full_pipeline_job"
-    assets: "__all__"
-    description: "Full pipeline: prices + all indicators"
+jobs: []
 
 ops:
   modules: []

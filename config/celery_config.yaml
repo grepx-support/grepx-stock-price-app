@@ -1,6 +1,6 @@
-# Celery configuration for stock_data_app
+# Celery configuration
 app:
-  name: "stock_data_app"
+  name: "price_app"
   version: "1.0.0"
   environment: ${APP_ENV:local}
 
@@ -27,8 +27,5 @@ task:
   result_expires: 3600
 
 tasks:
-  modules:
-    - "tasks.fetch_store_prices"
-    - "tasks.calculate_store_indicators"
+  modules: []
   directories: []
-
