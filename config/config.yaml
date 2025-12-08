@@ -30,19 +30,11 @@ tasks:
     - "tasks.stock_tasks"
   directories: []
 
-# MongoDB configuration
-mongodb:
-  connection_type: "atlas"  # "local" or "atlas"
-  database: stock_analysis  # Default database
-  
-  local:
-    host: localhost
-    port: 27017
-    database: stock_analysis
-    username: admin
-    password: password123
-    auth_source: admin
-  
-  atlas:
-    connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/?appName=grepx"
-    database: stock_analysis
+# Database configuration (ORM)
+database:
+#  connection_string: "mongodb://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis?appName=grepx"
+  connection_string: "mongodb://localhost:27017/mydb"
+  # Alternative formats:
+  # SQLite: "sqlite:///example.db"
+  # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
+  # MongoDB Local: "mongodb://admin:password123@localhost:27017/stock_analysis"

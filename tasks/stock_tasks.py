@@ -14,6 +14,6 @@ def fetch_stock_price(symbol: str):
 def store_stock_price(price_data: dict):
     """Celery task: store price"""
     # Lazy import to avoid circular dependency
-    from app.main import mongo_app
-    collection = mongo_app.connection.collection("stock_prices")
+    from app.main import orm_app
+    collection = orm_app.get_collection("stock_prices")
     return store_stock_price_data(price_data, collection)

@@ -14,7 +14,42 @@ mkdir -p "$DAGSTER_HOME"
 PID_FILE="logs/pids.txt"
 mkdir -p logs
 
+# Check if port is in use (works on Windows Git Bash and Linux)
+check_port() {
+    local port=$1
+    netstat -an 2>/dev/null | grep ":$port " | grep -q "LISTEN" && return 0 || return 1
+}
+
+# Kill process on port (works on Windows Git Bash and Linux)
+kill_port() {
+    local port=$1
+    echo "Checking port $port..."
+
+    # Check OS
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || uname -s | grep -qi "MINGW\|MSYS\|CYGWIN"; then
+        # Windows Git Bash
+        for pid in $(netstat -ano | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do
+            if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+                echo "  Killing PID $pid on port $port"
+                taskkill //PID $pid //F 2>/dev/null || true
+            fi
+        done
+    else
+        # Linux/Mac
+        local pid=$(lsof -ti:$port 2>/dev/null)
+        if [ -n "$pid" ]; then
+            echo "  Killing PID $pid on port $port"
+            kill -9 $pid 2>/dev/null || true
+        fi
+    fi
+}
+
 start_celery() {
+    if check_port 5555; then
+        echo "✗ Port 5555 already in use. Stop services first: ./run.sh stop"
+        return 1
+    fi
+
     echo "Starting Celery worker..."
     celery -A app.main worker --loglevel=info >> logs/celery.log 2>&1 &
     CELERY_PID=$!
@@ -23,6 +58,11 @@ start_celery() {
 }
 
 start_flower() {
+    if check_port 5555; then
+        echo "✗ Port 5555 already in use. Stop services first: ./run.sh stop"
+        return 1
+    fi
+
     echo "Starting Flower..."
     celery -A app.main flower --port=5555 >> logs/flower.log 2>&1 &
     FLOWER_PID=$!
@@ -31,6 +71,11 @@ start_flower() {
 }
 
 start_dagster() {
+    if check_port 3000; then
+        echo "✗ Port 3000 already in use. Stop services first: ./run.sh stop"
+        return 1
+    fi
+
     echo "Starting Dagster..."
     dagster dev -m app.main >> logs/dagster.log 2>&1 &
     DAGSTER_PID=$!
@@ -41,21 +86,24 @@ start_dagster() {
 stop_all() {
     echo "Stopping all services..."
 
-    if [ ! -f "$PID_FILE" ]; then
-        echo "No PID file found. Services may not be running."
-        return
+    # Stop by PID file
+    if [ -f "$PID_FILE" ]; then
+        while IFS=: read -r service pid; do
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "Stopping $service (PID: $pid)..."
+                kill "$pid" 2>/dev/null || true
+            fi
+        done < "$PID_FILE"
+        rm -f "$PID_FILE"
     fi
 
-    while IFS=: read -r service pid; do
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "Stopping $service (PID: $pid)..."
-            kill "$pid" 2>/dev/null || true
-        else
-            echo "$service (PID: $pid) is not running"
-        fi
-    done < "$PID_FILE"
+    # Also kill by port (cleanup any orphaned processes)
+    kill_port 5555  # Flower/Celery
+    kill_port 3000  # Dagster
 
-    rm -f "$PID_FILE"
+    # Kill celery workers by name
+    pkill -f "celery.*worker" 2>/dev/null || true
+
     echo "All services stopped."
 }
 
@@ -80,6 +128,7 @@ case "$1" in
         echo ""
         echo "All services started!"
         echo "Flower UI: http://localhost:5555"
+        echo "Dagster UI: http://localhost:3000"
         echo "Logs: tail -f logs/*.log"
         echo "Stop with: ./run.sh stop"
         ;;
