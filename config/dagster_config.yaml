@@ -8,7 +8,7 @@ dagster:
   home: ${oc.env:PROJECT_ROOT}/dagster_home
 
 assets:
-  modules: []
+  modules: [assets.stock_price_assets]
   directories: []
 
 jobs: []

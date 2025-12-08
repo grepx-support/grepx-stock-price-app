@@ -1,5 +1,3 @@
-# price_app/run.sh
-
 #!/bin/bash
 set -e
 
@@ -10,8 +8,8 @@ source common.sh
 
 activate_venv
 
-# Set DAGSTER_HOME to use configured directory
 export DAGSTER_HOME="$(pwd)/dagster_home"
+mkdir -p "$DAGSTER_HOME"
 
 PID_FILE="logs/pids.txt"
 mkdir -p logs
@@ -24,6 +22,14 @@ start_celery() {
     echo "celery:$CELERY_PID" >> "$PID_FILE"
 }
 
+start_flower() {
+    echo "Starting Flower..."
+    celery -A app.main flower --port=5555 >> logs/flower.log 2>&1 &
+    FLOWER_PID=$!
+    echo "Flower started with PID: $FLOWER_PID on http://localhost:5555"
+    echo "flower:$FLOWER_PID" >> "$PID_FILE"
+}
+
 start_dagster() {
     echo "Starting Dagster..."
     dagster dev -m app.main >> logs/dagster.log 2>&1 &
@@ -34,12 +40,12 @@ start_dagster() {
 
 stop_all() {
     echo "Stopping all services..."
-    
+
     if [ ! -f "$PID_FILE" ]; then
         echo "No PID file found. Services may not be running."
         return
     fi
-    
+
     while IFS=: read -r service pid; do
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             echo "Stopping $service (PID: $pid)..."
@@ -48,15 +54,16 @@ stop_all() {
             echo "$service (PID: $pid) is not running"
         fi
     done < "$PID_FILE"
-    
+
     rm -f "$PID_FILE"
     echo "All services stopped."
 }
 
 case "$1" in
     celery)
-        echo "Starting Celery worker..."
-        celery -A app.main worker --loglevel=info
+        echo "Starting Celery + Flower..."
+        start_celery
+        start_flower
         ;;
     dagster)
         echo "Starting Dagster..."
@@ -66,11 +73,14 @@ case "$1" in
         echo "Starting all services..."
         rm -f "$PID_FILE"
         start_celery
-        sleep 2
+        sleep 1
+        start_flower
+        sleep 1
         start_dagster
         echo ""
         echo "All services started!"
-        echo "Check logs: tail -f logs/celery.log logs/dagster.log"
+        echo "Flower UI: http://localhost:5555"
+        echo "Logs: tail -f logs/*.log"
         echo "Stop with: ./run.sh stop"
         ;;
     stop)
@@ -81,9 +91,9 @@ case "$1" in
         ;;
     *)
         echo "Usage: ./run.sh {celery|dagster|start|stop|status}"
-        echo "  celery  - Start Celery worker only"
+        echo "  celery  - Start Celery worker + Flower"
         echo "  dagster - Start Dagster only"
-        echo "  start   - Start all services (background)"
+        echo "  start   - Start all services (Celery, Flower, Dagster)"
         echo "  stop    - Stop all services"
         echo "  status  - Show app status"
         exit 1
