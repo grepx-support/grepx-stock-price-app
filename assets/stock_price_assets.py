@@ -21,16 +21,28 @@ def fetch_stock_prices(stock_symbols: List[str]):
         raise RuntimeError("Task 'fetch_stock_price' not found in Celery app")
 
 
+# @asset(group_name="stocks", deps=[fetch_stock_prices])
+# def stored_stock_prices(stock_symbols: List[str]):
+#     """Verify prices stored in DB"""
+#     from app.main import orm_app
+    
+#     collection = orm_app.get_collection("stock_prices")
+#     today = datetime.now().date().isoformat()
+    
+#     # Motor (async MongoDB driver) requires async calls
+#     return asyncio.run(collection.count_documents({
+#         "symbol": {"$in": stock_symbols},
+#         "date": today
+#     }))
 @asset(group_name="stocks", deps=[fetch_stock_prices])
-def stored_stock_prices(stock_symbols: List[str]):
+async def stored_stock_prices(stock_symbols: List[str]):
     """Verify prices stored in DB"""
     from app.main import orm_app
     
     collection = orm_app.get_collection("stock_prices")
     today = datetime.now().date().isoformat()
     
-    # Motor (async MongoDB driver) requires async calls
-    return asyncio.run(collection.count_documents({
+    return await collection.count_documents({
         "symbol": {"$in": stock_symbols},
         "date": today
-    }))
+    })

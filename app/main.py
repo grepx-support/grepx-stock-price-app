@@ -32,6 +32,13 @@ app = celery_app.app  # Expose for celery CLI
 # Create ORM connection (simple like basic_usage example)
 orm_session = Session.from_connection_string(config.database.connection_string)
 asyncio.run(orm_session.__aenter__())  # Connect
-orm_app = type('obj', (), {'get_collection': lambda name: orm_session.backend.database[name]})()
+orm_app = type(
+    'obj',
+    (),
+    {
+        'get_collection': lambda self, name: orm_session.backend.database[name]
+    }
+)()
+
 
 defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file
