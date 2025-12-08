@@ -20,9 +20,9 @@ from mongo_connection import create_app as create_mongo_app
 from dagster_framework.main import create_app as create_dagster_app
 
 # Create apps
-_celery_wrapper = create_celery_app(config)
-app = _celery_wrapper.app  # Expose for celery CLI
+celery_app = create_celery_app(config)
+app = celery_app.app  # Expose for celery CLI
 
-_mongo_app = create_mongo_app(OmegaConf.create({"mongodb": config.mongodb}))
+mongo_app = create_mongo_app(OmegaConf.create({"mongodb": config.mongodb}))
 
 defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file

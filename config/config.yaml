@@ -26,12 +26,14 @@ task:
   soft_time_limit: 1500
 
 tasks:
-  modules: []
+  modules:
+    - "tasks.stock_tasks"
   directories: []
 
 # MongoDB configuration
 mongodb:
   connection_type: "atlas"  # "local" or "atlas"
+  database: stock_analysis  # Default database
   
   local:
     host: localhost

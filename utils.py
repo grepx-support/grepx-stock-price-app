@@ -9,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 def get_collection(collection_name: str):
     """Get a MongoDB collection."""
-    return mongo_app.instance.connection.collection(collection_name)
+    return mongo_app.connection.collection(collection_name)
 
 
 def create_indexes():
     """Create indexes for collections."""
     try:
-        db = mongo_app.instance.db
+        db = mongo_app.db
         logger.info("Creating MongoDB indexes...")
         # You can add specific index creation logic here
         logger.info("MongoDB indexes created")

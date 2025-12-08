@@ -20,9 +20,10 @@ def fetch_stock_prices(stock_symbols: List[str]):
 @asset(group_name="stocks", deps=[fetch_stock_prices])
 def stored_stock_prices(stock_symbols: List[str]):
     """Verify prices stored in DB"""
+    from datetime import datetime
     from app.main import mongo_app
 
-    collection = mongo_app.instance.collection("stock_prices")
+    collection = mongo_app.connection.collection("stock_prices")
     today = datetime.now().date().isoformat()
 
     return collection.count_documents({
