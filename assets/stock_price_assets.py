@@ -1,48 +1,47 @@
 import asyncio
-from typing import List
+from typing import List, Dict
 from datetime import datetime
-from dagster import asset
+from dagster import asset, get_dagster_logger
+from app.main import orm_app
+from app.main import app as celery_app
 
 @asset(group_name="stocks")
-def stock_symbols() -> List[str]:
-    """Stock symbols to track"""
-    return ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
+def stock_config() -> Dict:
+    """Stock fetch configuration - CONFIGURABLE"""
+    return {
+        "symbols": ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN","NFLX","FB","NVDA","BABA","INTC","TCS"],
+        "start_date": "2021-12-01",
+        "end_date": "2025-12-01"
+    }
 
+@asset(group_name="stocks")
+def fetch_stock_prices(stock_config: Dict) -> Dict[str, str]:
+    logger = get_dagster_logger()   
+    task_ids = {}
+    for symbol in stock_config["symbols"]:
+        result = celery_app.send_task(
+            'tasks.stock_tasks.fetch_stock_price',
+            args=[symbol, stock_config["start_date"], stock_config["end_date"]]
+        )
+        task_ids[symbol] = result.id
+        logger.info(f"Queued fetch: {symbol} -> {result.id}")
+    return task_ids
 
-@asset(group_name="stocks", deps=[stock_symbols])
-def fetch_stock_prices(stock_symbols: List[str]):
-    """Trigger price fetch tasks"""
-    from app.main import app as celery_app_instance
-    # Get the task from Celery app registry
-    fetch_task = celery_app_instance.tasks.get('fetch_stock_price')
-    if fetch_task:
-        return [fetch_task.delay(symbol).id for symbol in stock_symbols]
-    else:
-        raise RuntimeError("Task 'fetch_stock_price' not found in Celery app")
-
-
-# @asset(group_name="stocks", deps=[fetch_stock_prices])
-# def stored_stock_prices(stock_symbols: List[str]):
-#     """Verify prices stored in DB"""
-#     from app.main import orm_app
+@asset(group_name="stocks")
+def store_stock_prices(fetch_stock_prices: Dict[str, str]) -> Dict:
+    """Dagster asset to queue storage tasks for all tickers"""
+    store_results = {}
+    if not fetch_stock_prices:
+        return store_results
     
-#     collection = orm_app.get_collection("stock_prices")
-#     today = datetime.now().date().isoformat()
-    
-#     # Motor (async MongoDB driver) requires async calls
-#     return asyncio.run(collection.count_documents({
-#         "symbol": {"$in": stock_symbols},
-#         "date": today
-#     }))
-@asset(group_name="stocks", deps=[fetch_stock_prices])
-async def stored_stock_prices(stock_symbols: List[str]):
-    """Verify prices stored in DB"""
-    from app.main import orm_app
-    
-    collection = orm_app.get_collection("stock_prices")
-    today = datetime.now().date().isoformat()
-    
-    return await collection.count_documents({
-        "symbol": {"$in": stock_symbols},
-        "date": today
-    })
+    for symbol, task_id in fetch_stock_prices.items():
+        try:
+            price_data = celery_app.AsyncResult(task_id).get(timeout=120)
+            if not price_data or price_data.get("status") != "success":
+                store_results[symbol] = None
+                continue
+            result = celery_app.send_task('tasks.stock_tasks.store_stock_price', args=[price_data, f"{symbol}_prices"])
+            store_results[symbol] = result.id
+        except Exception as e:
+            store_results[symbol] = None
+    return store_results
