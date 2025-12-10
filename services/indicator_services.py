@@ -1,79 +1,61 @@
-# price_app/services/indicator_service.py
 from datetime import datetime
 from typing import Dict, List
 import pandas as pd
-from factors.indicators import (
-    calculate_sma, calculate_ema, calculate_rsi,
-    calculate_macd, calculate_bollinger, calculate_atr
-)
+import asyncio
+import logging
+from factors.calculation import FACTORS
 from omegaconf import OmegaConf
 
-# Load indicator config once
-INDICATOR_CONFIG = OmegaConf.load("config/config.yaml").indicators
+logger = logging.getLogger(__name__)
+cfg = OmegaConf.load("config/config.yaml")
 
-def compute_all_indicators(symbol: str, price_records: List[Dict]) -> List[Dict]:
-    if not price_records:
+def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List[Dict]:
+    if not records or factor not in FACTORS:
+        logger.warning(f"Invalid input for {symbol}_{factor}")
         return []
+    try:
+        df = pd.DataFrame(records)
+        df['date'] = pd.to_datetime(df['date']).dt.date
+        df = df.sort_values('date').reset_index(drop=True)
+        
+        factor_cols = FACTORS[factor](df)
+        for col_name, col_data in factor_cols.items():
+            df[col_name] = col_data
+        
+        results = [{
+            "symbol": symbol,
+            "date": str(row['date']),
+            "factor": factor,
+            **{k: (float(row[k]) if pd.notna(row[k]) else "no data available") for k in factor_cols.keys()}
+        } for _, row in df.iterrows()]
+        
+        logger.info(f"Computed {factor} for {symbol}: {len(results)} records")
+        return results
+    except Exception as e:
+        logger.error(f"Error computing {factor} for {symbol}: {str(e)}")
+        raise
 
-    df = pd.DataFrame(price_records)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date').set_index('date')
+async def _store_async(records: List[Dict], collection) -> int:
+    inserted = 0
+    for rec in records:
+        try:
+            await collection.update_one({"symbol": rec["symbol"], "date": rec["date"]}, {"$set": rec}, upsert=True)
+            inserted += 1
+        except Exception as e:
+            logger.warning(f"Failed to store {rec.get('symbol')}_{rec.get('date')}: {e}")
+    return inserted
 
-    results = []
-    base = {
-        "symbol": symbol,
-        "source": "yfinance",
-        "fetched_at": datetime.now().isoformat()
-    }
-
-    # SMA
-    for p in INDICATOR_CONFIG.sma.periods:
-        df[f"sma_{p}"] = calculate_sma(df, p)
-    
-    # EMA
-    for p in INDICATOR_CONFIG.ema.periods:
-        df[f"ema_{p}"] = calculate_ema(df, p)
-
-    # RSI
-    df["rsi_14"] = calculate_rsi(df, INDICATOR_CONFIG.rsi.period)
-
-    # MACD
-    macd_line, signal_line, hist = calculate_macd(df,
-        INDICATOR_CONFIG.macd.fast,
-        INDICATOR_CONFIG.macd.slow,
-        INDICATOR_CONFIG.macd.signal)
-    df["macd"] = macd_line
-    df["macd_signal"] = signal_line
-    df["macd_hist"] = hist
-
-    # Bollinger Bands
-    upper, middle, lower = calculate_bollinger(df,
-        INDICATOR_CONFIG.bollinger.period,
-        INDICATOR_CONFIG.bollinger.std_dev)
-    df["bb_upper"] = upper
-    df["bb_middle"] = middle
-    df["bb_lower"] = lower
-
-    # ATR
-    df["atr_14"] = calculate_atr(df, INDICATOR_CONFIG.atr.period)
-
-    # Convert back to records
-    # After all calculations
-    df = df.reset_index()
-
-    results = []
-    for _, row in df.iterrows():
-        record = {
-        "symbol": symbol,
-        "date": str(row['date'].date()),
-        "source": "yfinance",
-        "fetched_at": datetime.now().isoformat()
-    }
-        # Only copy indicator fields (everything except raw OHLCV + metadata)
-        for col in df.columns:
-            if col in {'date', 'open', 'high', 'low', 'close', 'volume', 'symbol', 'fetched_at'}:
-                continue
-            value = row[col]
-            record[col] = float(value) if pd.notna(value) else None
-        results.append(record)
-    return results
+def store_single_factor(factor_data: List[Dict], collection) -> Dict:
+    if not factor_data:
+        return {"status": "no_data", "stored": 0}
+    try:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        stored = loop.run_until_complete(_store_async(factor_data, collection))
+        return {"status": "success", "stored": stored, "total": len(factor_data)}
+    except Exception as e:
+        logger.error(f"Error storing factor data: {str(e)}")
+        return {"status": "failed", "stored": 0, "error": str(e)}
