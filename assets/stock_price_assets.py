@@ -4,14 +4,17 @@ from datetime import datetime
 from dagster import asset, get_dagster_logger
 from app.main import orm_app
 from app.main import app as celery_app
+from omegaconf import OmegaConf
+
+cfg = OmegaConf.load("config/config.yaml")
 
 @asset(group_name="stocks")
 def stock_config() -> Dict:
     """Stock fetch configuration - CONFIGURABLE"""
     return {
-        "symbols": ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN","NFLX","FB","NVDA","BABA","INTC","TCS"],
-        "start_date": "2021-12-01",
-        "end_date": "2025-12-01"
+        "symbols": list(cfg.symbols),
+        "start_date": cfg.start_date,
+        "end_date": cfg.end_date
     }
 
 @asset(group_name="stocks")

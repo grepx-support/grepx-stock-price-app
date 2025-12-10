@@ -1,55 +1,75 @@
 # price_app/assets/indicator_assets.py
-from dagster import asset, get_dagster_logger
+from dagster import asset, AssetIn, get_dagster_logger
 from app.main import app as celery_app
-from typing import Dict, List
+from omegaconf import OmegaConf
+
+cfg = OmegaConf.load("config/config.yaml")
 
 @asset(group_name="indicators")
 def indicator_config():
     return {
-        "collections": {
-            "AAPL": "AAPL_factors",
-            "GOOGL": "GOOGL_factors",
-            "MSFT": "MSFT_factors",
-            "TSLA": "TSLA_factors",
-        }
+        "symbols": list(cfg.symbols),
+        "factors": list(cfg.indicators.keys())
     }
 
-@asset(group_name="indicators")
-def queue_indicator_computation(fetch_stock_prices: Dict[str, str], indicator_config) -> Dict[str, str]:
-    logger = get_dagster_logger()
-    task_ids = {}
+def _create_indicator_asset(factor_name: str):
+    @asset(
+        name=f"{factor_name.lower()}_indicator",
+        description=f"Compute {factor_name} for all symbols",
+        group_name="indicators",
+        ins={"fetch_stock_prices": AssetIn("fetch_stock_prices"), "indicator_config": AssetIn("indicator_config")}
+    )
+    def indicator_asset(fetch_stock_prices, indicator_config):
+        logger = get_dagster_logger()
+        results = []
+        
+        for symbol, fetch_task_id in fetch_stock_prices.items():
+            try:
+                price_data = celery_app.AsyncResult(fetch_task_id).get(timeout=180)
+                if price_data.get("status") == "success":
+                    result = celery_app.send_task(
+                        "tasks.indicator_tasks.compute",
+                        args=[symbol, factor_name, price_data["records"]]
+                    )
+                    results.append({"symbol": symbol, "factor": factor_name, "task_id": result.id})
+            except Exception as e:
+                logger.error(f"Failed to queue {factor_name} for {symbol}: {e}")
+        
+        return results
     
-    for symbol, fetch_task_id in fetch_stock_prices.items():
-        try:
-            price_data = celery_app.AsyncResult(fetch_task_id).get(timeout=180)
-            if price_data.get("status") == "success":
-                result = celery_app.send_task(
-                    "tasks.indicator_tasks.compute_indicators",
-                    args=[symbol, price_data["records"]]
-                )
-                task_ids[symbol] = result.id
-                logger.info(f"Queued indicators for {symbol}: {result.id}")
-        except Exception as e:
-            logger.error(f"Failed to queue indicators for {symbol}: {e}")
-    
-    return task_ids
+    return indicator_asset
 
-@asset(group_name="indicators")
-def store_indicators(queue_indicator_computation: Dict[str, str], indicator_config) -> Dict:
-    logger = get_dagster_logger()
-    results = {}
+# Dynamically create indicator assets
+_indicator_names = list(cfg.indicators.keys())
+for factor_name in _indicator_names:
+    globals()[f"{factor_name.lower()}_indicator"] = _create_indicator_asset(factor_name)
+
+# Dynamic store_indicators
+def _create_store_indicators():
+    ins_dict = {f"{name.lower()}_indicator": AssetIn(f"{name.lower()}_indicator") for name in _indicator_names}
+    ins_dict["indicator_config"] = AssetIn("indicator_config")
     
-    for symbol, task_id in queue_indicator_computation.items():
-        try:
-            data = celery_app.AsyncResult(task_id).get(timeout=300)
-            collection_name = indicator_config["collections"].get(symbol, f"{symbol}_factors")
-            store_task = celery_app.send_task(
-                "tasks.indicator_tasks.store_indicators",
-                args=[data, collection_name]
-            )
-            results[symbol] = store_task.id
-        except Exception as e:
-            results[symbol] = None
-            logger.error(f"Indicator storage failed for {symbol}: {e}")
+    @asset(group_name="indicators", ins=ins_dict)
+    def store_indicators(indicator_config, **kwargs):
+        logger = get_dagster_logger()
+        results = []
+        
+        for factor_name, indicator_list in {k: v for k, v in kwargs.items() if k != "indicator_config"}.items():
+            for indicator_data in (indicator_list if isinstance(indicator_list, list) else [indicator_list]):
+                symbol, factor, task_id = indicator_data["symbol"], indicator_data["factor"], indicator_data["task_id"]
+                
+                try:
+                    factor_data = celery_app.AsyncResult(task_id).get(timeout=600)
+                    if factor_data:
+                        result = celery_app.send_task("tasks.indicator_tasks.store", args=[symbol, factor, factor_data])
+                        results.append({"symbol": symbol, "factor": factor, "task_id": result.id, "status": "storing"})
+                        logger.info(f"Queued storage for {symbol}_{factor}: {result.id}")
+                except Exception as e:
+                    logger.error(f"Failed to queue storage for {symbol}_{factor}: {e}")
+                    results.append({"symbol": symbol, "factor": factor, "status": "failed", "error": str(e)})
+        
+        return results
     
-    return results
+    return store_indicators
+
+store_indicators = _create_store_indicators()

@@ -52,19 +52,36 @@ database:
   # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
   # MongoDB Local: "mongodb://admin:password123@localhost:27017/stock_analysis"
 
+symbols:
+  - "AAPL"
+  - "GOOGL"
+  - "MSFT"
+  - "TSLA"
+  - "AMZN"
+  - "NFLX"
+  - "META"
+  - "NVDA"
+  - "BABA"
+  - "INTC"
+  - "TCS.NS"
+
+start_date: "2021-12-01"
+end_date: "2025-12-01"
+
+# Note: casing in capital letters to denote constants
 indicators:
-  sma:
+  SMA:
     periods: [10, 20, 50, 100, 200]
-  ema:
+  EMA:
     periods: [12, 26, 50]
-  rsi:
+  RSI:
     period: 14
-  macd:
+  MACD:
     fast: 12
     slow: 26
     signal: 9
-  bollinger:
+  BOLLINGER:
     period: 20
     std_dev: 2
-  atr:
+  ATR:
     period: 14
