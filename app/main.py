@@ -1,34 +1,44 @@
 # price_app/app/main.py
 
-from config.paths import CELERY_CONFIG, DAGSTER_CONFIG, MONGO_CONFIG, ROOT
-from app.loader import AppLoader
+from pathlib import Path
+from omegaconf import OmegaConf
 import os
+import sys
+import asyncio
 
+# Setup paths
+ROOT = Path(__file__).parent.parent
+CONFIG_DIR = ROOT / "config"
+CONFIG_FILE = CONFIG_DIR / "config.yaml"
 os.environ["PROJECT_ROOT"] = str(ROOT)
 
-# Create loaders
-celery_app = AppLoader(
-    name="Celery",
-    config_path=CELERY_CONFIG,
-    factory=lambda cfg: __import__('celery_framework').create_app(cfg)
-)
+# Add ormlib to path (parent directory so 'src' imports work)
+ormlib_path = ROOT.parent / "libs" / "py-orm-libs"
+if str(ormlib_path) not in sys.path:
+    sys.path.insert(0, str(ormlib_path))
 
-dagster_app = AppLoader(
-    name="Dagster",
-    config_path=None,
-    factory=lambda: __import__('dagster_framework.main', fromlist=['create_app']).create_app(
-        config_path=str(DAGSTER_CONFIG.parent)
-    )
-)
+# Load config
+config = OmegaConf.load(CONFIG_FILE)
 
-mongo_app = AppLoader(
-    name="MongoDB",
-    config_path=MONGO_CONFIG,
-    factory=lambda cfg: __import__('mongo_connection', fromlist=['create_app']).create_app(cfg)
-)
+# Initialize frameworks
+from celery_framework import create_app as create_celery_app
+from src.core import Session  # Must import after path setup
+from dagster_framework.main import create_app as create_dagster_app
 
-# Expose Celery app instance for CLI usage (celery -A app.main worker)
-app = celery_app.instance.app
+# Create apps
+celery_app = create_celery_app(config)
+app = celery_app.app  # Expose for celery CLI
 
-# Expose Dagster definitions for CLI usage (dagster dev -f app.main)
-defs = dagster_app.instance
+# Create ORM connection (simple like basic_usage example)
+orm_session = Session.from_connection_string(config.database.connection_string)
+asyncio.run(orm_session.__aenter__())  # Connect
+orm_app = type(
+    'obj',
+    (),
+    {
+        'get_collection': lambda self, name: orm_session.backend.database[name]
+    }
+)()
+
+
+defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file

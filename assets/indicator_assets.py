@@ -1,112 +1,55 @@
-"""Factory for creating indicator assets - submits Celery tasks."""
-from dagster import asset, AssetIn, Failure
-import logging
-from config.paths import DAGSTER_CONFIG
-from omegaconf import OmegaConf
+# price_app/assets/indicator_assets.py
+from dagster import asset, get_dagster_logger
+from app.main import app as celery_app
+from typing import Dict, List
 
-logger = logging.getLogger(__name__)
+@asset(group_name="indicators")
+def indicator_config():
+    return {
+        "collections": {
+            "AAPL": "AAPL_factors",
+            "GOOGL": "GOOGL_factors",
+            "MSFT": "MSFT_factors",
+            "TSLA": "TSLA_factors",
+        }
+    }
 
-# Initialize MongoDB connection
-# MongoDBConnection.connect()
-# MongoDBManager.create_indexes()
-
-
-def get_indicator_config(indicator_name: str):
-    cfg = OmegaConf.load(DAGSTER_CONFIG)
-    return cfg.assets.config.get(f"{indicator_name.lower()}_indicator", {})
-
-
-def create_indicator_asset(indicator_name: str):
-    """Factory function to create indicator assets."""
-
-    @asset(
-        name=f"{indicator_name.lower()}_indicator",
-        description=f"Calculate {indicator_name} for all symbols",
-        group_name="stock_indicators",
-        ins={"price_ingestion": AssetIn("price_ingestion")}
-    )
-    def indicator_asset(price_ingestion):
+@asset(group_name="indicators")
+def queue_indicator_computation(fetch_stock_prices: Dict[str, str], indicator_config) -> Dict[str, str]:
+    logger = get_dagster_logger()
+    task_ids = {}
+    
+    for symbol, fetch_task_id in fetch_stock_prices.items():
         try:
-            from app.main import app as celery_app
-            cfg = get_indicator_config(indicator_name)  
-
-            timeout = cfg.get("timeout", 600)
-            task_name = cfg.get("celery_task", "tasks.calculate_store_indicators")
-
-
-            results = price_ingestion["results"]
-            symbols = [r["symbol"] for r in results if r["status"] == "success"]
-            source = price_ingestion["source"]
-
-            if not symbols:
-                logger.warning(f"No symbols for {indicator_name}")
-                return {"indicator": indicator_name, "status": "no_data", "results": []}
-
-            logger.info(f"Submitting {indicator_name} tasks to Celery for {len(symbols)} symbols")
-
-            tasks = []
-            for symbol in symbols:
-                try:   
-                    task = celery_app.send_task(
-                        task_name,
-                        kwargs={
-                            "symbol": symbol,
-                            "indicator_name": indicator_name,
-                            "source": source
-                        }
-                    )
-                    tasks.append((symbol, task))
-                except Exception as e:
-                    logger.error(f"Failed submitting {symbol}: {str(e)}", exc_info=True)
-
-            indicator_results = []
-
-            for symbol, task in tasks:
-                try:
-                    result = task.get(timeout=timeout)
-                    indicator_results.append(result)
-                except Exception as e:
-                    indicator_results.append({
-                        "symbol": symbol,
-                        "indicator": indicator_name,
-                        "source": source,
-                        "status": "error",
-                        "error": str(e)
-                    })
-
-            successful = sum(1 for r in indicator_results if r.get("status") == "success")
-            if successful == 0:
-                raise Failure(f"{indicator_name}: No indicators were stored for ANY symbol.")
-
-            # Fail if any task returned success but stored zero rows
-            zero_row_failures = [
-                r for r in indicator_results
-                if r.get("status") == "success" and r.get("rows", 0) == 0
-            ]
-            if zero_row_failures:
-                raise Failure(
-                    f"{indicator_name}: Some symbols computed successfully but stored 0 rows: "
-                    f"{[r['symbol'] for r in zero_row_failures]}"
+            price_data = celery_app.AsyncResult(fetch_task_id).get(timeout=180)
+            if price_data.get("status") == "success":
+                result = celery_app.send_task(
+                    "tasks.indicator_tasks.compute_indicators",
+                    args=[symbol, price_data["records"]]
                 )
-
-            return {
-                "indicator": indicator_name,
-                "total_symbols": len(symbols),
-                "successful": successful,
-                "results": indicator_results
-            }
-
+                task_ids[symbol] = result.id
+                logger.info(f"Queued indicators for {symbol}: {result.id}")
         except Exception as e:
-            logger.error(f"{indicator_name} pipeline failed: {str(e)}", exc_info=True)
-            raise Failure(f"{indicator_name} pipeline failed: {str(e)}")
+            logger.error(f"Failed to queue indicators for {symbol}: {e}")
+    
+    return task_ids
 
-    return indicator_asset
-
-
-# Create all indicators
-atr_indicator = create_indicator_asset("ATR")
-ema_indicator = create_indicator_asset("EMA")
-sma_indicator = create_indicator_asset("SMA")
-bollinger_indicator = create_indicator_asset("BOLLINGER")
-macd_indicator = create_indicator_asset("MACD")
-rsi_indicator = create_indicator_asset("RSI")
+@asset(group_name="indicators")
+def store_indicators(queue_indicator_computation: Dict[str, str], indicator_config) -> Dict:
+    logger = get_dagster_logger()
+    results = {}
+    
+    for symbol, task_id in queue_indicator_computation.items():
+        try:
+            data = celery_app.AsyncResult(task_id).get(timeout=300)
+            collection_name = indicator_config["collections"].get(symbol, f"{symbol}_factors")
+            store_task = celery_app.send_task(
+                "tasks.indicator_tasks.store_indicators",
+                args=[data, collection_name]
+            )
+            results[symbol] = store_task.id
+        except Exception as e:
+            results[symbol] = None
+            logger.error(f"Indicator storage failed for {symbol}: {e}")
+    
+    return results
