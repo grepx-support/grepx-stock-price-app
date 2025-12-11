@@ -44,8 +44,7 @@ tasks:
 
 # Database configuration (ORM)
 database:
-  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis"
-  # connection_string: "mongodb://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis?appName=grepx"
+  connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
   # connection_string: "mongodb://localhost:27017/mydb"
   # Alternative formats:
   # SQLite: "sqlite:///example.db"

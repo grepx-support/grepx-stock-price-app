@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Dict, List
+import polars as pl
 import pandas as pd
 import asyncio
 import logging
@@ -10,25 +11,35 @@ logger = logging.getLogger(__name__)
 cfg = OmegaConf.load("config/config.yaml")
 
 def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List[Dict]:
+    """Compute single factor with Polars"""
     if not records or factor not in FACTORS:
         logger.warning(f"Invalid input for {symbol}_{factor}")
         return []
     try:
-        df = pd.DataFrame(records)
-        df['date'] = pd.to_datetime(df['date']).dt.date
-        df = df.sort_values('date').reset_index(drop=True)
-        
-        factor_cols = FACTORS[factor](df)
+        df = pl.DataFrame(records)
+        df = df.with_columns(pl.col('date').cast(pl.Date)).sort('date')
+
+        df_pandas = df.to_pandas()
+        factor_cols = FACTORS[factor](df_pandas)
+        factor_col_names = list(factor_cols.keys())
+
         for col_name, col_data in factor_cols.items():
-            df[col_name] = col_data
-        
-        results = [{
-            "symbol": symbol,
-            "date": str(row['date']),
-            "factor": factor,
-            **{k: (float(row[k]) if pd.notna(row[k]) else "no data available") for k in factor_cols.keys()}
-        } for _, row in df.iterrows()]
-        
+            df = df.with_columns(pl.Series(col_name, col_data))
+
+        for col in factor_col_names:
+            df = df.with_columns(
+                pl.when(pl.col(col).is_null())
+                  .then(pl.lit("no data available"))
+                  .otherwise(pl.col(col).cast(pl.Utf8))
+                  .alias(col)
+            )
+
+        df = df.with_columns([
+            pl.lit(symbol).alias('symbol'),
+            pl.lit(factor).alias('factor')
+        ])
+
+        results = df.select(['symbol', 'date'] + factor_col_names + ['factor']).to_dicts()
         logger.info(f"Computed {factor} for {symbol}: {len(results)} records")
         return results
     except Exception as e:
