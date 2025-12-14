@@ -35,9 +35,11 @@
 #         raise self.retry(exc=e)
 
 # price_app/tasks/indicator_tasks.py
+
 from celery import shared_task
 from services.indicator_services import compute_single_factor, store_single_factor
 import logging
+from services.naming import naming
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +55,16 @@ def compute(self, symbol, factor, price_records):
         logger.error(f"Error computing {factor} for {symbol}: {e}")
         raise self.retry(exc=e, countdown=10)
 
+
 @shared_task(name="tasks.indicator_tasks.store", bind=True, max_retries=2)
 def store(self, symbol, factor, factor_data):
     """Store computed factor data to MongoDB"""
     try:
         from app.main import orm_app
-        collection = orm_app.get_collection(f"{symbol.lower()}_{factor.lower()}")
-        logger.info(f"Storing {factor} for {symbol}")
+        # Use naming convention instead of hardcoded pattern
+        collection_name = naming.get_indicator_collection_name(symbol, factor)
+        collection = orm_app.get_collection(collection_name)
+        logger.info(f"Storing {factor} for {symbol} to {collection_name}")
         result = store_single_factor(factor_data, collection)
         logger.info(f"Stored {factor} for {symbol}: {result['stored']} records")
         return result

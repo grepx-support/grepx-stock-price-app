@@ -30,15 +30,23 @@ celery_app = create_celery_app(config)
 app = celery_app.app  # Expose for celery CLI
 
 # Create ORM connection (simple like basic_usage example)
-orm_session = Session.from_connection_string(config.database.connection_string)
-asyncio.run(orm_session.__aenter__())  # Connect
+orm_session = None
+
+def get_orm_session():
+    """Get or create ORM session (lazy initialization with async connection)"""
+    global orm_session
+    if orm_session is None:
+        orm_session = Session.from_connection_string(config.database.connection_string)
+        # Establish async connection to database
+        asyncio.run(orm_session.__aenter__())
+    return orm_session
+
 orm_app = type(
     'obj',
     (),
     {
-        'get_collection': lambda self, name: orm_session.backend.database[name]
+        'get_collection': lambda self, name: get_orm_session().backend.database[name]
     }
 )()
-
 
 defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file

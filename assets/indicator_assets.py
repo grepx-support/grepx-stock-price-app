@@ -5,6 +5,8 @@ from omegaconf import OmegaConf
 
 cfg = OmegaConf.load("config/config.yaml")
 
+SYNCHRONOUS = cfg.celery.synchronous
+
 @asset(group_name="indicators")
 def indicator_config():
     return {

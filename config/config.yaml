@@ -15,10 +15,11 @@ celery:
     - json
   timezone: "Asia/Kolkata"
   enable_utc: true
+  synchronous: true
 
 worker:
   pool: "prefork"  # ⚡ Changed from 'solo' to prefork for parallel execution
-  max_concurrent: 20  # ⚡ Increased from 10
+  max_concurrent: 5  # ⚡ Increased from 10
   worker_prefetch_multiplier: 4  # ⚡ Better load balancing
   worker_max_tasks_per_child: 1000
 
@@ -44,14 +45,16 @@ tasks:
 
 # Database configuration (ORM)
 database:
-  connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
+  #connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
+  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis?authSource=admin"
   # connection_string: "mongodb://localhost:27017/mydb"
   # Alternative formats:
-  # SQLite: "sqlite:///example.db"
+  #connection_string: "sqlite:///example.db"
   # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
   # MongoDB Local: "mongodb://admin:password123@localhost:27017/stock_analysis"
 
 symbols:
+  # Stocks
   - "AAPL"
   - "GOOGL"
   - "MSFT"
@@ -63,6 +66,30 @@ symbols:
   - "BABA"
   - "INTC"
   - "TCS.NS"
+
+  # Indices
+  - "^GSPC"         # S&P 500 index
+
+  # Mutual Fund
+  - "VFINX"         # Vanguard 500 Index Fund
+
+  # ETF
+  - "SPY"           # SPDR S&P 500 ETF
+
+  # Commodity
+  - "GC=F"          # Gold Futures
+
+  # Forex
+  - "EURUSD=X"      # Euro / US Dollar
+
+  # Futures
+  - "ES=F"          # S&P 500 E-mini Futures
+
+  # Crypto
+  - "BTC-USD"       # Bitcoin
+
+  # Options (symbol usually linked to underlying)
+  - "AAPL210917C00145000"  # Example AAPL call option
 
 start_date: "2021-12-01"
 end_date: "2025-12-01"
@@ -84,3 +111,25 @@ indicators:
     std_dev: 2
   ATR:
     period: 14
+
+
+factors:
+  missing_value:
+    text: "no data available"
+    numeric: null
+
+columns:
+  high: "high"
+  low: "low"
+  close: "close"
+  open: "open"
+  volume: "volume"
+
+naming_convention:
+
+  case_mode: lower
+  separator: "_"
+  
+  # Collection name templates (only {symbol} and {factor} are replaced)
+  price_template: "{symbol}{sep}prices"
+  indicator_template: "{symbol}{sep}{factor}"
