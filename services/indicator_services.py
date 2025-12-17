@@ -6,18 +6,17 @@ import asyncio
 import logging
 from factors.calculation import FACTORS
 from factors.types import MissingValueConfig
-from omegaconf import OmegaConf
+from factors.config import cfg
 
 logger = logging.getLogger(__name__)
 
-cfg = OmegaConf.load("config/config.yaml")
 
 MISSING_VALUE = MissingValueConfig(
     text=cfg.factors.missing_value.text,
     numeric=cfg.factors.missing_value.numeric
 )
 
-def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List[Dict]:
+def compute_single_factor(symbol: str, factor: str, records: List[Dict],  indicator_config=None) -> List[Dict]:
     """Compute single factor with Polars"""
     if not records or factor not in FACTORS:
         logger.warning(f"Invalid input for {symbol}_{factor}")
@@ -35,12 +34,8 @@ def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List
 
         for col in factor_col_names:
             df = df.with_columns(
-                pl.when(pl.col(col).is_null() | pl.col(col).is_nan())
-  .then(pl.lit(MISSING_VALUE.text))
-  .otherwise(pl.col(col).cast(pl.Utf8))
-  .alias(col)
+                pl.when(pl.col(col).is_null() | pl.col(col).is_nan()).then(pl.lit(MISSING_VALUE.text)).otherwise(pl.col(col).cast(pl.Utf8)).alias(col)
             )
-
         df = df.with_columns([
             pl.lit(symbol).alias('symbol'),
             pl.lit(factor).alias('factor'),

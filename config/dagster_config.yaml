@@ -9,8 +9,10 @@ dagster:
 
 assets:
   modules:
-    - "assets.stock_price_assets"
-    - "assets.indicator_assets"
+    - "assets.base_assets"
+    - "assets.stocks.stocks_assets"
+    - "assets.indices.indices_assets"
+    - "assets.futures.futures_assets"
   directories: []
 
 jobs: []

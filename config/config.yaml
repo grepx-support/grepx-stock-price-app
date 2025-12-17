@@ -39,8 +39,11 @@ task:
 
 tasks:
   modules:
-    - "tasks.stock_tasks"
-    - "tasks.indicator_tasks"
+    - "tasks.base_tasks"
+    - "tasks.stocks.stocks_tasks"
+    - "tasks.indices.indices_tasks"
+    - "tasks.futures.futures_tasks"
+
   directories: []
 
 # Database configuration (ORM)
@@ -53,48 +56,35 @@ database:
   # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
   # MongoDB Local: "mongodb://admin:password123@localhost:27017/stock_analysis"
 
-symbols:
-  # Stocks
-  - "AAPL"
-  - "GOOGL"
-  - "MSFT"
-  - "TSLA"
-  - "AMZN"
-  - "NFLX"
-  - "META"
-  - "NVDA"
-  - "BABA"
-  - "INTC"
-  - "TCS.NS"
-
-  # Indices
-  - "^GSPC"         # S&P 500 index
-
-  # Mutual Fund
-  - "VFINX"         # Vanguard 500 Index Fund
-
-  # ETF
-  - "SPY"           # SPDR S&P 500 ETF
-
-  # Commodity
-  - "GC=F"          # Gold Futures
-
-  # Forex
-  - "EURUSD=X"      # Euro / US Dollar
-
-  # Futures
-  - "ES=F"          # S&P 500 E-mini Futures
-
-  # Crypto
-  - "BTC-USD"       # Bitcoin
-
-  # Options (symbol usually linked to underlying)
-  - "AAPL210917C00145000"  # Example AAPL call option
+asset_types:
+  stocks:
+    symbols:
+      - "AAPL"
+      - "GOOGL"
+      - "MSFT"
+      - "TSLA"
+      - "AMZN"
+    fetch_timeout: 120
+    store_timeout: 120
+    
+  indices:
+    symbols:
+      - "^GSPC"
+      - "^NSEI"
+    fetch_timeout: 120
+    store_timeout: 120
+    
+  futures:
+    symbols:
+      - "ES=F"
+      - "NQ=F"
+      - "YM=F"
+    fetch_timeout: 180
+    store_timeout: 180
 
 start_date: "2021-12-01"
 end_date: "2025-12-01"
 
-# Note: casing in capital letters to denote constants
 indicators:
   SMA:
     periods: [10, 20, 50, 100, 200]
@@ -112,7 +102,6 @@ indicators:
   ATR:
     period: 14
 
-
 factors:
   missing_value:
     text: "no data available"
@@ -126,10 +115,7 @@ columns:
   volume: "volume"
 
 naming_convention:
-
   case_mode: lower
   separator: "_"
-  
-  # Collection name templates (only {symbol} and {factor} are replaced)
   price_template: "{symbol}{sep}prices"
   indicator_template: "{symbol}{sep}{factor}"

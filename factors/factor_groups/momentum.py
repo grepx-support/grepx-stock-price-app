@@ -1,9 +1,6 @@
 from factors.indicators.rsi import calculate_rsi
 from factors.indicators.macd import calculate_macd
-from omegaconf import OmegaConf
-
-
-cfg = OmegaConf.load("config/config.yaml")
+from factors.config import cfg
 
 
 def rsi_factor(df):
