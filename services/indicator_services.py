@@ -5,12 +5,18 @@ import pandas as pd
 import asyncio
 import logging
 from factors.calculation import FACTORS
-from omegaconf import OmegaConf
+from factors.types import MissingValueConfig
+from factors.config import cfg
 
 logger = logging.getLogger(__name__)
-cfg = OmegaConf.load("config/config.yaml")
 
-def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List[Dict]:
+
+MISSING_VALUE = MissingValueConfig(
+    text=cfg.factors.missing_value.text,
+    numeric=cfg.factors.missing_value.numeric
+)
+
+def compute_single_factor(symbol: str, factor: str, records: List[Dict],  indicator_config=None) -> List[Dict]:
     """Compute single factor with Polars"""
     if not records or factor not in FACTORS:
         logger.warning(f"Invalid input for {symbol}_{factor}")
@@ -28,15 +34,12 @@ def compute_single_factor(symbol: str, factor: str, records: List[Dict]) -> List
 
         for col in factor_col_names:
             df = df.with_columns(
-                pl.when(pl.col(col).is_null())
-                  .then(pl.lit("no data available"))
-                  .otherwise(pl.col(col).cast(pl.Utf8))
-                  .alias(col)
+                pl.when(pl.col(col).is_null() | pl.col(col).is_nan()).then(pl.lit(MISSING_VALUE.text)).otherwise(pl.col(col).cast(pl.Utf8)).alias(col)
             )
-
         df = df.with_columns([
             pl.lit(symbol).alias('symbol'),
-            pl.lit(factor).alias('factor')
+            pl.lit(factor).alias('factor'),
+            pl.col('date').cast(pl.Utf8).alias('date')
         ])
 
         results = df.select(['symbol', 'date'] + factor_col_names + ['factor']).to_dicts()
