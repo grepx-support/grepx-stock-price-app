@@ -1,0 +1,64 @@
+# Domain Configuration - Business Logic Settings
+
+# Asset types and symbols
+asset_types:
+  stocks:
+    symbols:
+      - "AAPL"
+      - "GOOGL"
+      - "MSFT"
+      - "TSLA"
+      - "AMZN"
+    fetch_timeout: 120
+    store_timeout: 120
+    
+  indices:
+    symbols:
+      - "^GSPC"
+      - "^NSEI"
+    fetch_timeout: 120
+    store_timeout: 120
+    
+  futures:
+    symbols:
+      - "ES=F"
+      - "NQ=F"
+      - "YM=F"
+    fetch_timeout: 180
+    store_timeout: 180
+
+# Date range defaults
+start_date: "2021-12-01"
+end_date: "2025-12-01"
+
+# Indicator configurations
+indicators:
+  SMA:
+    periods: [10, 20, 50, 100, 200]
+  EMA:
+    periods: [12, 26, 50]
+  RSI:
+    period: 14
+  MACD:
+    fast: 12
+    slow: 26
+    signal: 9
+  BOLLINGER:
+    period: 20
+    std_dev: 2
+  ATR:
+    period: 14
+
+# Missing value configuration
+factors:
+  missing_value:
+    text: "no data available"
+    numeric: null
+
+# Naming conventions
+naming_convention:
+  case_mode: lower
+  separator: "_"
+  price_template: "{symbol}{sep}prices"
+  indicator_template: "{symbol}{sep}{factor}"
+

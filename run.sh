@@ -20,6 +20,45 @@ check_port() {
     netstat -an 2>/dev/null | grep ":$port " | grep -q "LISTEN" && return 0 || return 1
 }
 
+# Check if service is running on port
+check_service() {
+    local service_name=$1
+    local port=$2
+    if check_port "$port"; then
+        echo "✓ $service_name is running on port $port"
+        return 0
+    else
+        echo "✗ $service_name is NOT running on port $port"
+        return 1
+    fi
+}
+
+# Check all required dependencies
+check_dependencies() {
+    echo "Checking dependencies..."
+    local missing=0
+    
+    if ! check_service "MongoDB" 27017; then
+        missing=$((missing + 1))
+        echo "  → Start MongoDB: mongod (or use Docker: docker run -d -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=password123 mongo)"
+    fi
+    
+    if ! check_service "Redis" 6379; then
+        missing=$((missing + 1))
+        echo "  → Start Redis: redis-server (or use Docker: docker run -d -p 6379:6379 redis)"
+    fi
+    
+    if [ $missing -gt 0 ]; then
+        echo ""
+        echo "ERROR: $missing required service(s) are not running!"
+        echo "Please start MongoDB and Redis before running the application."
+        return 1
+    fi
+    
+    echo "All dependencies are running!"
+    return 0
+}
+
 # Kill process on port (works on Windows Git Bash and Linux)
 kill_port() {
     local port=$1

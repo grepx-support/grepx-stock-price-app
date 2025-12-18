@@ -1,0 +1,57 @@
+# Infrastructure Configuration - Technical Settings
+
+# App metadata
+app:
+  name: "price_app"
+  version: "1.0.0"
+
+# Celery configuration
+celery:
+  broker_url: "redis://127.0.0.1:6379/0"
+  result_backend: "redis://127.0.0.1:6379/1"
+  task_serializer: "json"
+  result_serializer: "json"
+  accept_content:
+    - json
+  timezone: "Asia/Kolkata"
+  enable_utc: true
+  synchronous: true
+
+# Worker configuration
+worker:
+  pool: "prefork"
+  max_concurrent: 5
+  worker_prefetch_multiplier: 4
+  worker_max_tasks_per_child: 1000
+
+# Task configuration
+task:
+  track_started: true
+  time_limit: 600
+  soft_time_limit: 500
+  task_compression: "gzip"
+  task_ignore_result: false
+  autoretry_for: [Exception]
+  max_retries: 2
+  default_retry_delay: 5
+
+# Task modules
+tasks:
+  modules:
+    - "adapters.tasks.price_tasks"
+    - "adapters.tasks.indicator_tasks"
+  directories: []
+
+# Database configuration
+database:
+  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis?authSource=admin"
+  # Alternative formats:
+  # MongoDB Cloud: "mongodb+srv://user:pass@cluster.mongodb.net/db?appName=app"
+  # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
+  # SQLite: "sqlite:///example.db"
+
+# Dagster configuration
+dagster:
+  module_name: "price_app"
+  home: ${oc.env:PROJECT_ROOT}/../dagster_home
+

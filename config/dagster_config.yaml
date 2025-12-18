@@ -7,15 +7,11 @@ dagster:
   module_name: "price_app"
   home: ${oc.env:PROJECT_ROOT}/../dagster_home
 
+# Assets configuration - Use infrastructure/workflows/dagster_workflow.py instead
+# These sections are required by Dagster framework (even if empty)
 assets:
-  modules:
-    - "assets.base_assets"
-    - "assets.stocks.stocks_assets"
-    - "assets.indices.indices_assets"
-    - "assets.futures.futures_assets"
+  modules: []
   directories: []
-
-jobs: []
 
 ops:
   modules: []
