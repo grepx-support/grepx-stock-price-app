@@ -2,7 +2,6 @@
 app:
   name: "price_app"
   version: "1.0.0"
-
 dagster:
   module_name: "price_app"
   home: ${oc.env:PROJECT_ROOT}/../dagster_home
