@@ -1,8 +1,8 @@
 """Main application entry point."""
-import os
-import sys
-from pathlib import Path
 
+import sys
+import os
+from pathlib import Path
 from omegaconf import OmegaConf
 
 from price_app.src.main.price_app.connections.connection_manager import ConnectionManager
@@ -18,10 +18,12 @@ ormlib_path = ROOT.parent / "libs" / "py-orm-libs"
 if str(ormlib_path) not in sys.path:
     sys.path.insert(0, str(ormlib_path))
 
+# Load config
 config = OmegaConf.load(CONFIG_FILE)
 connections = ConnectionManager(config, CONFIG_DIR)
 
-# Convenience accessors
+
+# Get connections (lazy loaded)
 def get_database(db_name: str = None):
     """Get database or specific database."""
     db = connections.get_database()
@@ -43,13 +45,16 @@ def get_dagster_defs():
     return connections.get_dagster().get_definitions()
 
 
-# Expose for direct access
-app = get_celery_app  # For celery CLI: celery -A price_app.main worker
-defs = get_dagster_defs  # For dagster CLI
+# Expose Celery app for celery CLI
+app = get_celery_app()
+
+# Expose Dagster defs for dagster CLI
+defs = get_dagster_defs()
+
 
 if __name__ == "__main__":
     print("Initializing connections...")
     print(f"✓ Database: {get_database()}")
-    print(f"✓ Celery: {get_celery_app()}")
-    print(f"✓ Dagster: {get_dagster_defs()}")
+    print(f"✓ Celery: {app}")
+    print(f"✓ Dagster: {defs}")
     print("\nAll connections initialized!")

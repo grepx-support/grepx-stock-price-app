@@ -1,8 +1,10 @@
 """Connection manager using registry pattern."""
-from price_app.src.main.price_app.connections.celery_connection import CeleryConnection
-from price_app.src.main.price_app.connections.connection_registry import ConnectionRegistry
-from price_app.src.main.price_app.connections.dagster_connection import DagsterConnection
-from price_app.src.main.price_app.connections.database_connection import DatabaseConnection
+
+from .connection_registry import ConnectionRegistry
+from .database_connection import DatabaseConnection
+from .celery_connection import CeleryConnection
+from .dagster_connection import DagsterConnection
+
 
 class ConnectionManager:
     """Manages all application connections using registry."""
