@@ -1,9 +1,9 @@
 """Configuration management for price_app using Hydra."""
 
-from .app_config import AppConfigLoader
-from .asset_config import AssetConfigLoader
-from .dagster_config import DagsterConfigLoader
-from .loader import ConfigLoader
+from .app_config_loader import AppConfigLoader
+from .asset_config_loader import AssetConfigLoader
+from .dagster_config_loader import DagsterConfigLoader
+from .config_loader import ConfigLoader
 from .schemas import AppConfig, AssetConfig, DagsterConfig
 
 __all__ = [
