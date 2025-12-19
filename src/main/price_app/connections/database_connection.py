@@ -3,9 +3,8 @@
 import asyncio
 import threading
 
-from core import Session
+from core.session import Session
 from .connection_base import ConnectionBase
-
 
 class DatabaseConnection(ConnectionBase):
     """Database connection using ORM libs with connection pooling."""
