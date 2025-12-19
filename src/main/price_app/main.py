@@ -9,8 +9,8 @@ import threading
 
 # Setup paths
 ROOT = Path(__file__).parent.parent
-CONFIG_DIR = ROOT / "config"
-CONFIG_FILE = CONFIG_DIR / "config.yaml"
+CONFIG_DIR = ROOT / "resources"
+CONFIG_FILE = CONFIG_DIR / "resources.yaml"
 os.environ["PROJECT_ROOT"] = str(ROOT)
 
 # Add ormlib to path (parent directory so 'src' imports work)
@@ -18,7 +18,7 @@ ormlib_path = ROOT.parent / "libs" / "py-orm-libs"
 if str(ormlib_path) not in sys.path:
     sys.path.insert(0, str(ormlib_path))
 
-# Load config
+# Load resources
 config = OmegaConf.load(CONFIG_FILE)
 
 # Initialize frameworks
@@ -59,4 +59,4 @@ class ORMApp:
 
 orm_app = ORMApp()
 
-defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own config file
+defs = create_dagster_app(config_path=str(CONFIG_DIR))  # Dagster uses its own resources file

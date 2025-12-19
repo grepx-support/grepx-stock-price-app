@@ -1,8 +1,8 @@
 from omegaconf import OmegaConf
 
-cfg = OmegaConf.load("config/config.yaml")
+cfg = OmegaConf.load("resources/resources.yaml")
 
-# Column names from config
+# Column names from resources
 high = cfg.columns.high
 low = cfg.columns.low
 close = cfg.columns.close

@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Dict, Any
-from app.main import mongo_app
+from price_app.src.main.price_app.main import mongo_app
 
 logger = logging.getLogger(__name__)
 
