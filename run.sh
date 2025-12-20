@@ -4,147 +4,217 @@ set -e
 cd "$(dirname "$0")"
 source common.sh
 
-[ ! -d "venv" ] && echo "Error: Run setup.sh first" && exit 1
-
+# Initialize project
+check_venv
 activate_venv
+setup_project_paths
 
-export DAGSTER_HOME="$(pwd)/dagster_home"
-mkdir -p "$DAGSTER_HOME"
+# Verify PYTHONPATH is set
+if [ -z "$PYTHONPATH" ]; then
+    log_error "PYTHONPATH is not set!"
+    exit 1
+fi
+log "PYTHONPATH: $PYTHONPATH"
 
+# Service configuration
 PID_FILE="logs/pids.txt"
-mkdir -p logs
+LOG_DIR="logs"
 
-# Check if port is in use (works on Windows Git Bash and Linux)
-check_port() {
-    local port=$1
-    netstat -an 2>/dev/null | grep ":$port " | grep -q "LISTEN" && return 0 || return 1
-}
-
-# Kill process on port (works on Windows Git Bash and Linux)
-kill_port() {
-    local port=$1
-    echo "Checking port $port..."
-
-    # Check OS
-    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || uname -s | grep -qi "MINGW\|MSYS\|CYGWIN"; then
-        # Windows Git Bash
-        for pid in $(netstat -ano | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do
-            if [ -n "$pid" ] && [ "$pid" != "0" ]; then
-                echo "  Killing PID $pid on port $port"
-                taskkill //PID $pid //F 2>/dev/null || true
-            fi
-        done
-    else
-        # Linux/Mac
-        local pid=$(lsof -ti:$port 2>/dev/null)
-        if [ -n "$pid" ]; then
-            echo "  Killing PID $pid on port $port"
-            kill -9 $pid 2>/dev/null || true
+# Start service
+start_service() {
+    local name=$1
+    local cmd=$2
+    local log_file="$LOG_DIR/${name}.log"
+    
+    if [ -f "$PID_FILE" ] && grep -q "^${name}:" "$PID_FILE" 2>/dev/null; then
+        local old_pid=$(grep "^${name}:" "$PID_FILE" | cut -d: -f2)
+        if is_running "$old_pid"; then
+            log "$name is already running (PID: $old_pid)"
+            return 0
         fi
     fi
+    
+    log "Starting $name..."
+    # Ensure PYTHONPATH is set in the command for background processes
+    eval "PYTHONPATH=\"$PYTHONPATH\" $cmd >> $log_file 2>&1 &"
+    local pid=$!
+    echo "${name}:${pid}" >> "$PID_FILE"
+    log "$name started (PID: $pid)"
 }
 
-start_celery() {
-    if check_port 5555; then
-        echo "✗ Port 5555 already in use. Stop services first: ./run.sh stop"
-        return 1
+# Stop service
+stop_service() {
+    local name=$1
+    if [ ! -f "$PID_FILE" ]; then
+        return 0
     fi
-
-    echo "Starting Celery worker..."
-    celery -A app.main worker --loglevel=info >> logs/celery.log 2>&1 &
-    CELERY_PID=$!
-    echo "Celery started with PID: $CELERY_PID"
-    echo "celery:$CELERY_PID" >> "$PID_FILE"
-}
-
-start_flower() {
-    if check_port 5555; then
-        echo "✗ Port 5555 already in use. Stop services first: ./run.sh stop"
-        return 1
+    
+    local pid=$(grep "^${name}:" "$PID_FILE" 2>/dev/null | cut -d: -f2)
+    if [ -n "$pid" ] && is_running "$pid"; then
+        log "Stopping $name (PID: $pid)..."
+        kill "$pid" 2>/dev/null || true
+        sleep 1
+        kill -9 "$pid" 2>/dev/null || true
+        remove_pid_from_file "$name" "$PID_FILE"
+        log "$name stopped"
     fi
-
-    echo "Starting Flower..."
-    celery -A app.main flower --port=5555 >> logs/flower.log 2>&1 &
-    FLOWER_PID=$!
-    echo "Flower started with PID: $FLOWER_PID on http://localhost:5555"
-    echo "flower:$FLOWER_PID" >> "$PID_FILE"
 }
 
-start_dagster() {
-    if check_port 3000; then
-        echo "✗ Port 3000 already in use. Stop services first: ./run.sh stop"
-        return 1
-    fi
-
-    echo "Starting Dagster..."
-    dagster dev -m app.main >> logs/dagster.log 2>&1 &
-    DAGSTER_PID=$!
-    echo "Dagster started with PID: $DAGSTER_PID"
-    echo "dagster:$DAGSTER_PID" >> "$PID_FILE"
-}
-
-stop_all() {
-    echo "Stopping all services..."
-
-    # Stop by PID file
-    if [ -f "$PID_FILE" ]; then
-        while IFS=: read -r service pid; do
-            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                echo "Stopping $service (PID: $pid)..."
-                kill "$pid" 2>/dev/null || true
+# Status check
+check_status() {
+    log "Checking service status..."
+    echo ""
+    
+    local services=("celery" "flower" "dagster")
+    local all_running=true
+    
+    for service in "${services[@]}"; do
+        if [ -f "$PID_FILE" ]; then
+            local pid=$(grep "^${service}:" "$PID_FILE" 2>/dev/null | cut -d: -f2)
+            if [ -n "$pid" ] && is_running "$pid"; then
+                echo "  ✓ $service: RUNNING (PID: $pid)"
+            else
+                echo "  ✗ $service: STOPPED"
+                all_running=false
             fi
-        done < "$PID_FILE"
-        rm -f "$PID_FILE"
+        else
+            echo "  ✗ $service: STOPPED"
+            all_running=false
+        fi
+    done
+    
+    echo ""
+    if [ "$all_running" = true ]; then
+        log "All services are running"
+        echo "  Flower: http://localhost:5555"
+        echo "  Dagster: http://localhost:3000"
+    else
+        log "Some services are not running"
     fi
-
-    # Also kill by port (cleanup any orphaned processes)
-    kill_port 5555  # Flower/Celery
-    kill_port 3000  # Dagster
-
-    # Kill celery workers by name
-    pkill -f "celery.*worker" 2>/dev/null || true
-
-    echo "All services stopped."
 }
 
+# View logs
+view_logs() {
+    local service=$1
+    local log_file="$LOG_DIR/${service}.log"
+    
+    if [ ! -f "$log_file" ]; then
+        log_error "Log file not found: $log_file"
+        return 1
+    fi
+    
+    if [ "$2" = "tail" ] || [ "$2" = "follow" ]; then
+        log "Following $service logs (Ctrl+C to stop)..."
+        tail -f "$log_file"
+    else
+        cat "$log_file"
+    fi
+}
+
+# Stop all services by port (fallback when PID file is missing)
+stop_by_ports() {
+    log "Stopping all services by port..."
+    
+    # Kill processes by port
+    log "Killing processes on port 3000 (Dagster)..."
+    kill_port 3000
+    
+    log "Killing processes on port 5555 (Flower)..."
+    kill_port 5555
+    
+    # Also try to kill by process name as fallback
+    log "Killing processes by name..."
+    pkill -f "celery.*worker" 2>/dev/null || true
+    pkill -f "flower" 2>/dev/null || true
+    pkill -f "dagster" 2>/dev/null || true
+    
+    # Clean up PID file if it exists
+    [ -f "$PID_FILE" ] && rm -f "$PID_FILE" || true
+    
+    log "All services stopped by port"
+}
+
+# Main commands
 case "$1" in
-    celery)
-        echo "Starting Celery + Flower..."
-        start_celery
-        start_flower
-        ;;
-    dagster)
-        echo "Starting Dagster..."
-        dagster dev -m app.main
-        ;;
     start)
-        echo "Starting all services..."
-        rm -f "$PID_FILE"
-        start_celery
-        sleep 1
-        start_flower
-        sleep 1
-        start_dagster
+        log "Starting all services..."
+        start_service "celery" "celery -A celery_app.celery_app:app worker --loglevel=info"
+        sleep 2
+        start_service "flower" "celery -A celery_app.celery_app:app flower --port=5555"
+        sleep 2
+        start_service "dagster" "dagster dev -m dagster_app.dagster_app"
+        sleep 2
         echo ""
-        echo "All services started!"
-        echo "Flower UI: http://localhost:5555"
-        echo "Dagster UI: http://localhost:3000"
-        echo "Logs: tail -f logs/*.log"
-        echo "Stop with: ./run.sh stop"
+        check_status
         ;;
+    
     stop)
-        stop_all
+        log "Stopping all services..."
+        # Try to stop by PID first
+        stop_service "celery"
+        stop_service "flower"
+        stop_service "dagster"
+        # Fallback: kill by ports if PID file is missing or empty
+        if [ ! -f "$PID_FILE" ] || [ ! -s "$PID_FILE" ]; then
+            log "PID file missing or empty, using port-based kill..."
+            stop_by_ports
+        else
+            # Clean up any remaining processes
+            pkill -f "celery.*worker" 2>/dev/null || true
+            pkill -f "flower" 2>/dev/null || true
+            pkill -f "dagster" 2>/dev/null || true
+            # Kill processes on ports as additional cleanup
+            kill_port 3000
+            kill_port 5555
+        fi
+        log "All services stopped"
         ;;
+    
+    kill-ports|stop-ports)
+        stop_by_ports
+        ;;
+    
+    restart)
+        log "Restarting all services..."
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
+    
     status)
-        $VENV_PYTHON -m app.main
+        check_status
         ;;
+    
+    logs)
+        if [ -z "$2" ]; then
+            log_error "Usage: ./run.sh logs {celery|flower|dagster} [tail|follow]"
+            exit 1
+        fi
+        view_logs "$2" "$3"
+        ;;
+    
+    celery)
+        start_service "celery" "celery -A celery_app.celery_app:app worker --loglevel=info"
+        start_service "flower" "celery -A celery_app.celery_app:app flower --port=5555"
+        ;;
+    
+    dagster)
+        cd src/main
+        dagster dev -m dagster_app.dagster_app
+        ;;
+    
     *)
-        echo "Usage: ./run.sh {celery|dagster|start|stop|status}"
-        echo "  celery  - Start Celery worker + Flower"
-        echo "  dagster - Start Dagster only"
-        echo "  start   - Start all services (Celery, Flower, Dagster)"
-        echo "  stop    - Stop all services"
-        echo "  status  - Show app status"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster}"
+        echo ""
+        echo "Commands:"
+        echo "  start      - Start all services"
+        echo "  stop       - Stop all services (tries PID first, falls back to ports)"
+        echo "  restart    - Restart all services"
+        echo "  status     - Check service status"
+        echo "  logs       - View logs: ./run.sh logs {celery|flower|dagster} [tail]"
+        echo "  kill-ports - Force stop all services by killing processes on ports 3000, 5555"
+        echo "  celery     - Start celery and flower only"
+        echo "  dagster    - Start dagster in foreground"
         exit 1
         ;;
 esac

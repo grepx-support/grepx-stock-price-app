@@ -1,0 +1,1 @@
+"""Price app test package."""

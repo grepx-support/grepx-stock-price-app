@@ -1,0 +1,21 @@
+# Dagster configuration
+app:
+  name: "servers"
+  version: "1.0.0"
+dagster:
+  module_name: "servers"
+  home: ${oc.env:PROJECT_ROOT}/../dagster_home
+
+assets:
+  modules:
+    - "dagster_app.assets.base_assets"
+    - "dagster_app.assets.stocks.stocks_assets"
+    - "dagster_app.assets.indices.indices_assets"
+    - "dagster_app.assets.futures.futures_assets"
+  directories: []
+
+jobs: []
+
+ops:
+  modules: []
+  directories: []
