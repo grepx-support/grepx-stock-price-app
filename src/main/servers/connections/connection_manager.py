@@ -1,9 +1,12 @@
 """Connection manager using registry pattern."""
 
 from .connection_registry import ConnectionRegistry
-from .database_connection import DatabaseConnection
-from .celery_connection import CeleryConnection
-from .dagster_connection import DagsterConnection
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database_app.database_connection import DatabaseConnection
+    from celery_app.celery_connection import CeleryConnection
+    from dagster_app.dagster_connection import DagsterConnection
 
 
 class ConnectionManager:
@@ -15,24 +18,33 @@ class ConnectionManager:
         self.config_dir = config_dir
         self.registry = ConnectionRegistry()
     
-    def get_database(self) -> DatabaseConnection:
+    def get_database(self):
         """Get or create database connection."""
+        # Lazy import to avoid circular dependency
+        from database_app.database_connection import DatabaseConnection
+        
         if not self.registry.has('database'):
             db = DatabaseConnection(self.config)
             db.connect()
             self.registry.register('database', db)
         return self.registry.get('database')
     
-    def get_celery(self) -> CeleryConnection:
+    def get_celery(self):
         """Get or create Celery connection."""
+        # Lazy import to avoid circular dependency
+        from celery_app.celery_connection import CeleryConnection
+        
         if not self.registry.has('celery'):
             celery = CeleryConnection(self.config)
             celery.connect()
             self.registry.register('celery', celery)
         return self.registry.get('celery')
     
-    def get_dagster(self) -> DagsterConnection:
+    def get_dagster(self):
         """Get or create Dagster connection."""
+        # Lazy import to avoid circular dependency
+        from dagster_app.dagster_connection import DagsterConnection
+        
         if not self.registry.has('dagster'):
             dagster = DagsterConnection(self.config, self.config_dir)
             dagster.connect()

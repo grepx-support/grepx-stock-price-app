@@ -1,6 +1,6 @@
 """Celery connection using celery_framework."""
 from celery_framework import create_app
-from .connection_base import ConnectionBase
+from servers.connections.connection_base import ConnectionBase
 class CeleryConnection(ConnectionBase):
     """Celery connection using celery_framework."""
     def connect(self) -> None:

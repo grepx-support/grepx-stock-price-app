@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 from typing import Optional
 from omegaconf import OmegaConf, DictConfig
-from servers import ConnectionManager
+# Lazy import to avoid circular dependency
+from servers.connections.connection_manager import ConnectionManager
 
 class AppContext:
     """

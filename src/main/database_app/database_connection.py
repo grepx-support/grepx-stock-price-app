@@ -2,7 +2,7 @@
 
 import asyncio
 import threading
-from .connection_base import ConnectionBase
+from servers.connections.connection_base import ConnectionBase
 
 
 class DatabaseConnection(ConnectionBase):

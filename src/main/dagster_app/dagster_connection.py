@@ -1,6 +1,6 @@
 """Dagster connection using dagster_framework."""
 
-from .connection_base import ConnectionBase
+from servers.connections.connection_base import ConnectionBase
 
 
 class DagsterConnection(ConnectionBase):
