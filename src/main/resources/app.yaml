@@ -2,7 +2,7 @@
 
 # App metadata
 app:
-  name: "price_app"
+  name: "servers"
   version: "1.0.0"
 
 # Celery configuration

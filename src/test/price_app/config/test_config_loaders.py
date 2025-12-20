@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from price_app.src.main.price_app.config import ConfigLoader
+from price_app.src.main.servers.config import ConfigLoader
 
 # Add src/main to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "main"))
@@ -15,7 +15,7 @@ def test_app_config():
     
     cfg = loader.load_app_config()
     
-    assert cfg.app.name == "price_app"
+    assert cfg.app.name == "servers"
     assert cfg.celery.broker_url
     assert len(cfg.tasks.modules) > 0
     
@@ -45,7 +45,7 @@ def test_dagster_config():
     
     cfg = loader.load_dagster_config()
     
-    assert cfg.dagster.module_name == "price_app"
+    assert cfg.dagster.module_name == "servers"
     assert len(cfg.assets.modules) > 0
     
     print(f"  ✓ Module name: {cfg.dagster.module_name}")

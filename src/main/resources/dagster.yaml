@@ -1,9 +1,9 @@
 # Dagster configuration
 app:
-  name: "price_app"
+  name: "servers"
   version: "1.0.0"
 dagster:
-  module_name: "price_app"
+  module_name: "servers"
   home: ${oc.env:PROJECT_ROOT}/../dagster_home
 
 assets:

@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from price_app.src.main.price_app.connections.connection_manager import ConnectionManager
+from price_app.src.main.servers.connections.connection_manager import ConnectionManager
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "main"))
 
 class TestConnectionManager(unittest.TestCase):

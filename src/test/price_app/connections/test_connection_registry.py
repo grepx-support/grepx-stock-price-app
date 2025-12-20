@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from price_app.src.main.price_app.connections.connection_registry import ConnectionRegistry
+from price_app.src.main.servers.connections.connection_registry import ConnectionRegistry
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "main"))
 

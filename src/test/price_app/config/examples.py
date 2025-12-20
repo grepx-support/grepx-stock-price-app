@@ -1,5 +1,5 @@
 """Example usage of ConfigLoader."""
-from price_app.src.main.price_app.config import ConfigLoader
+from price_app.src.main.servers.config import ConfigLoader
 
 
 def example_basic_usage():
