@@ -1,7 +1,7 @@
 # services/naming.py  (or wherever NamingConvention lives)
 
 from omegaconf import OmegaConf
-from factors.config import cfg
+from servers.factors.config import cfg
 
 
 class NamingConvention:

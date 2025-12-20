@@ -8,10 +8,10 @@ dagster:
 
 assets:
   modules:
-    - "assets.base_assets"
-    - "assets.stocks.stocks_assets"
-    - "assets.indices.indices_assets"
-    - "assets.futures.futures_assets"
+    - "dagster_app.assets.base_assets"
+    - "dagster_app.assets.stocks.stocks_assets"
+    - "dagster_app.assets.indices.indices_assets"
+    - "dagster_app.assets.futures.futures_assets"
   directories: []
 
 jobs: []

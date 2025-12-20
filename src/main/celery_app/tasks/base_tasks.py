@@ -1,5 +1,18 @@
-from celery import shared_task
 import logging
+import sys
+from pathlib import Path
+
+# Ensure src/main is in path for Celery worker import context
+src_main_path = Path(__file__).resolve().parent.parent.parent
+if str(src_main_path) not in sys.path:
+    sys.path.insert(0, str(src_main_path))
+
+# Ensure ORM library is in path BEFORE importing anything that uses it
+orm_path = src_main_path.parent.parent / "libs" / "grepx-orm-libs" / "src"
+if str(orm_path) not in sys.path:
+    sys.path.insert(0, str(orm_path))
+
+from celery import shared_task
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +39,16 @@ class TaskFactory:
         """Create a store price task"""
         def store_task(self, price_data, symbol):
             try:
-                from app.main import orm_app
-                from services.naming import naming
-                
+                from servers.app.application import AppContext
+                from database_app.services.naming import naming
+
                 db_name = naming.get_analysis_db_name(asset_type)
-                
+
                 collection_name = naming.get_price_collection_name(asset_type, symbol)
-                #db = orm_app.get_database(db_name)
-                collection = orm_app.get_collection(db_name, collection_name)
-                
-                
+                #db = AppContext.get_database(db_name)
+                collection = AppContext.get_collection(db_name, collection_name)
+
+
                 logger.info(f"[{asset_type.upper()}] Storing {symbol} to {db_name}.{collection_name}")
                 result = service_func(price_data, collection)
                 logger.info(f"[{asset_type.upper()}] Stored {symbol}: {result.get('stored', 0)} records")
@@ -43,7 +56,7 @@ class TaskFactory:
             except Exception as exc:
                 logger.error(f"[{asset_type.upper()}] Store error for {symbol}: {exc}")
                 raise self.retry(exc=exc, countdown=2 ** self.request.retries)
-        
+
         return store_task
     
     @staticmethod
@@ -65,14 +78,14 @@ class TaskFactory:
     def create_store_indicator_task(service_func, asset_type: str):
         def store_task(self, symbol, factor, factor_data):
             try:
-                from app.main import orm_app
-                from services.naming import naming
+                from servers.app.application import AppContext
+                from database_app.services.naming import naming
 
                 db_name = naming.get_analysis_db_name(asset_type)
                 collection_name = naming.get_indicator_collection_name(asset_type, symbol, factor)
 
-                #db = orm_app.get_database(db_name)
-                collection = orm_app.get_collection(db_name, collection_name)
+                #db = AppContext.get_database(db_name)
+                collection = AppContext.get_collection(db_name, collection_name)
 
                 logger.info(f"[{asset_type.upper()}] Storing {factor} for {symbol} → {db_name}.{collection_name}")
 

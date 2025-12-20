@@ -1,6 +1,6 @@
-from factors.indicators.rsi import calculate_rsi
-from factors.indicators.macd import calculate_macd
-from factors.config import cfg
+from servers.factors.indicators.rsi import calculate_rsi
+from servers.factors.indicators.macd import calculate_macd
+from servers.factors.config import cfg
 
 
 def rsi_factor(df):

@@ -38,7 +38,7 @@ class AppContext:
         os.environ["PROJECT_ROOT"] = str(self.root)
 
         # Add ormlib to path
-        ormlib_path = self.root.parent / "libs" / "py-orm-libs"
+        ormlib_path = self.root.parent / "libs" / "grepx-orm-libs"
         if str(ormlib_path) not in sys.path:
             sys.path.insert(0, str(ormlib_path))
 
