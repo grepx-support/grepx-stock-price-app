@@ -138,11 +138,11 @@ stop_by_ports() {
 case "$1" in
     start)
         log "Starting all services..."
-        start_service "celery" "celery -A servers.main:app worker --loglevel=info"
+        start_service "celery" "celery -A servers.celery_app:app worker --loglevel=info"
         sleep 2
-        start_service "flower" "celery -A servers.main:app flower --port=5555"
+        start_service "flower" "celery -A servers.celery_app:app flower --port=5555"
         sleep 2
-        start_service "dagster" "dagster dev -m servers.main"
+        start_service "dagster" "dagster dev -m servers.dagster"
         sleep 2
         echo ""
         check_status

@@ -1,3 +1,1 @@
-"""App package."""
-
-__all__ = []
+"""App package - handles application initialization."""
