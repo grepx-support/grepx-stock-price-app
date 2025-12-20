@@ -61,10 +61,10 @@ setup_project_paths() {
         PROJECT_ROOT="$(pwd)"
     fi
     cd "$PROJECT_ROOT"
-    
+
     # Convert to absolute path
     PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
-    
+
     # Set Python path (absolute path)
     local python_path="$PROJECT_ROOT/src/main"
     if [ -d "$python_path" ]; then
@@ -73,11 +73,20 @@ setup_project_paths() {
         log_error "Python path not found: $python_path"
         exit 1
     fi
-    
+
+    # Add ORM library to PYTHONPATH
+    local orm_lib_path="$PROJECT_ROOT/../libs/grepx-orm-libs/src"
+    if [ -d "$orm_lib_path" ]; then
+        export PYTHONPATH="$orm_lib_path:$PYTHONPATH"
+    else
+        log_error "ORM library path not found: $orm_lib_path"
+        exit 1
+    fi
+
     # Set Dagster home
     export DAGSTER_HOME="$PROJECT_ROOT/dagster_home"
     mkdir -p "$DAGSTER_HOME" logs
-    
+
     # Export for use in other scripts
     export PROJECT_ROOT
 }

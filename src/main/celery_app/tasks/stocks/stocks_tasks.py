@@ -1,16 +1,16 @@
 from celery import shared_task
-from tasks.base_tasks import TaskFactory
-from services.stock_services import (
+from celery_app.tasks.base_tasks import TaskFactory
+from database_app.services.stock_services import (
     fetch_stock_price_data,
     store_stock_price_data
 )
-from services.indicator_services import compute_single_factor, store_single_factor
-from services.naming import naming
+from database_app.services.indicator_services import compute_single_factor, store_single_factor
+from database_app.services.naming import naming
 
 # Create fetch task using factory
 _fetch_func = TaskFactory.create_fetch_task(fetch_stock_price_data, "STOCKS")
 fetch_stock_price = shared_task(
-    name="tasks.stocks.stocks_tasks.fetch_stock_price",
+    name="celery_app.tasks.stocks.stocks_tasks.fetch_stock_price",
     bind=True,
     max_retries=3
 )(_fetch_func)
@@ -22,7 +22,7 @@ _store_func = TaskFactory.create_store_task(
     # naming.get_price_collection_name
 )
 store_stock_price = shared_task(
-    name="tasks.stocks.stocks_tasks.store_stock_price",
+    name="celery_app.tasks.stocks.stocks_tasks.store_stock_price",
     bind=True,
     max_retries=2
 )(_store_func)
@@ -30,7 +30,7 @@ store_stock_price = shared_task(
 # Create compute task using factory
 _compute_func = TaskFactory.create_compute_task(compute_single_factor, "STOCKS")
 compute = shared_task(
-    name="tasks.stocks.stocks_tasks.compute",
+    name="celery_app.tasks.stocks.stocks_tasks.compute",
     bind=True,
     max_retries=2
 )(_compute_func)
@@ -42,7 +42,7 @@ _store_ind_func = TaskFactory.create_store_indicator_task(
     # naming.get_indicator_collection_name
 )
 store = shared_task(
-    name="tasks.stocks.stocks_tasks.store",
+    name="celery_app.tasks.stocks.stocks_tasks.store",
     bind=True,
     max_retries=2
 )(_store_ind_func)

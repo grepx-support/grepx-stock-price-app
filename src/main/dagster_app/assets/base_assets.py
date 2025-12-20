@@ -1,8 +1,8 @@
 # servers/assets/base_assets.py
 from dagster import asset, get_dagster_logger, AssetIn
-from app.main import app as celery_app
+from servers.app.application import AppContext
 from typing import Dict, List
-from factors.config import cfg
+from servers.factors.config import cfg
 from omegaconf import OmegaConf
 
 class StockAssetFactory:
@@ -48,7 +48,7 @@ class StockAssetFactory:
             end_date = prices_config["end_date"]
 
             for symbol in symbols:
-                result = celery_app.send_task(task_name, args=[symbol, start_date, end_date])
+                result = AppContext.get_celery_app().send_task(task_name, args=[symbol, start_date, end_date])
                 task_ids[symbol] = result.id
                 logger.info(f"[{asset_type.upper()}] Queued fetch: {symbol} -> {result.id}")
 
@@ -68,12 +68,12 @@ class StockAssetFactory:
             store_results = {}
             for symbol, task_id in fetch_task_ids.items():
                 try:
-                    price_data = celery_app.AsyncResult(task_id).get(timeout=120)
+                    price_data = AppContext.get_celery_app().AsyncResult(task_id).get(timeout=120)
                     if not price_data or price_data.get("status") != "success":
                         logger.warning(f"[{asset_type.upper()}] Fetch failed for {symbol}")
                         store_results[symbol] = None
                         continue
-                    result = celery_app.send_task(task_name, args=[price_data, symbol])
+                    result = AppContext.get_celery_app().send_task(task_name, args=[price_data, symbol])
                     store_results[symbol] = result.id
                     logger.info(f"[{asset_type.upper()}] Queued store: {symbol} -> {result.id}")
                 except Exception as e:
@@ -103,10 +103,10 @@ class StockAssetFactory:
                 if not task_id:
                     continue
                 try:
-                    price_data = celery_app.AsyncResult(task_id).get(timeout=120)
+                    price_data = AppContext.get_celery_app().AsyncResult(task_id).get(timeout=120)
                     if price_data.get("status") == "success":
-                        result = celery_app.send_task(
-                            f'tasks.{asset_type}.{asset_type}_tasks.compute',
+                        result = AppContext.get_celery_app().send_task(
+                            f'celery_app.tasks.{asset_type}.{asset_type}_tasks.compute',
                             args=[symbol, indicator_name, price_data["records"], indicator_config],
                         )
                         results.append({
@@ -135,7 +135,7 @@ class StockAssetFactory:
         def store_indicators_asset(**kwargs) -> List:
             logger = get_dagster_logger()
             store_results = []
-            store_task_name = f"tasks.{asset_type}.{asset_type}_tasks.store"
+            store_task_name = f"celery_app.tasks.{asset_type}.{asset_type}_tasks.store"
 
             for indicator_name in indicator_names:
                 key = f"{indicator_name.lower()}_task_ids"
@@ -146,8 +146,8 @@ class StockAssetFactory:
                     factor = item["factor"]
                     compute_task_id = item["task_id"]
                     try:
-                        factor_data = celery_app.AsyncResult(compute_task_id).get(timeout=180)
-                        result = celery_app.send_task(
+                        factor_data = AppContext.get_celery_app().AsyncResult(compute_task_id).get(timeout=180)
+                        result = AppContext.get_celery_app().send_task(
                             store_task_name,
                             args=[symbol, factor, factor_data]
                         )

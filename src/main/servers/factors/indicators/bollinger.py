@@ -1,6 +1,6 @@
 import pandas as pd
 import talib
-from factors.config import close
+from servers.factors.config import close
 
 def calculate_bollinger(df: pd.DataFrame, period=20, std_dev=2):
     return talib.BBANDS(

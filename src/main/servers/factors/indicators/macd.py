@@ -1,6 +1,6 @@
 import pandas as pd
 import talib
-from factors.config import close
+from servers.factors.config import close
 
 def calculate_macd(df: pd.DataFrame, fast=12, slow=26, signal=9):
     return talib.MACD(

@@ -4,9 +4,9 @@ import polars as pl
 import pandas as pd
 import asyncio
 import logging
-from factors.calculation import FACTORS
-from factors.types import MissingValueConfig
-from factors.config import cfg
+from servers.factors.calculation import FACTORS
+from servers.factors.types import MissingValueConfig
+from servers.factors.config import cfg
 
 logger = logging.getLogger(__name__)
 

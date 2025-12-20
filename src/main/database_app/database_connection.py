@@ -2,7 +2,17 @@
 
 import asyncio
 import threading
+import sys
+from pathlib import Path
+
+# Add ORM library to path if not already there
+# Navigate from database_app/database_connection.py -> src/main -> grepx-orchestrator -> libs/grepx-orm-libs/src
+orm_path = Path(__file__).resolve().parent.parent.parent.parent.parent / "libs" / "grepx-orm-libs" / "src"
+if str(orm_path) not in sys.path:
+    sys.path.insert(0, str(orm_path))
+
 from servers.connections.connection_base import ConnectionBase
+from core import Session
 
 
 class DatabaseConnection(ConnectionBase):
@@ -18,8 +28,6 @@ class DatabaseConnection(ConnectionBase):
         if self._client is None:
             with self._lock:
                 if self._client is None:
-                    from core import Session
-                    
                     self._session = Session.from_connection_string(
                         self.config.database.connection_string
                     )

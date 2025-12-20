@@ -1,6 +1,6 @@
-from factors.indicators.atr import calculate_atr
-from factors.indicators.bollinger import calculate_bollinger
-from factors.config import cfg
+from servers.factors.indicators.atr import calculate_atr
+from servers.factors.indicators.bollinger import calculate_bollinger
+from servers.factors.config import cfg
 
 def atr_factor(df):
     return {
