@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from database_app.database_connection import DatabaseConnection
     from celery_app.celery_connection import CeleryConnection
     from dagster_app.dagster_connection import DagsterConnection
+    from prefect_app.prefect_app import load_prefect_flows
 
 
 class ConnectionManager:
@@ -50,6 +51,12 @@ class ConnectionManager:
             dagster.connect()
             self.registry.register('dagster', dagster)
         return self.registry.get('dagster')
+    
+    def get_prefect_flows(self):
+        """Get Prefect flows."""
+        # Lazy import to avoid circular dependency
+        from price_app.src.main.prefect_app.prefect_app import load_prefect_flows
+        return load_prefect_flows()
     
     def disconnect_all(self) -> None:
         """Disconnect all connections."""

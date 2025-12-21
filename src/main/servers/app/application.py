@@ -7,6 +7,9 @@ from omegaconf import OmegaConf, DictConfig
 # Lazy import to avoid circular dependency
 from servers.connections.connection_manager import ConnectionManager
 
+# Prefect app import
+from price_app.src.main.prefect_app.prefect_app import load_prefect_flows
+
 class AppContext:
     """
     Singleton application context manager.
@@ -49,6 +52,8 @@ class AppContext:
     def _initialize_connections(self) -> None:
         """Initialize connection manager."""
         self.connections = ConnectionManager(self.config, self.config_dir)
+        # Load Prefect flows
+        self.prefect_flows = load_prefect_flows()
 
     @classmethod
     def get_instance(cls) -> 'AppContext':
@@ -117,6 +122,16 @@ class AppContext:
             Dagster definitions
         """
         return cls.get_connections().get_dagster().get_definitions()
+
+    @classmethod
+    def get_prefect_flows(cls):
+        """
+        Get Prefect flows.
+
+        Returns:
+            Dictionary of Prefect flows
+        """
+        return cls.get_instance().prefect_flows
 
     @classmethod
     def reset(cls) -> None:
