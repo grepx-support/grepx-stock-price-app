@@ -1,6 +1,6 @@
 # price_app/src/main/prefect_app/deployments/deploy_price_flows.py
 
-from price_app.src.main.prefect_app.flows.etl_price_flow import price_etl_flow
+from prefect_app.flows.etl_price_flow import price_etl_flow
 
 
 if __name__ == "__main__":
