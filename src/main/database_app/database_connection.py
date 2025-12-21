@@ -17,12 +17,25 @@ from core import Session
 
 class DatabaseConnection(ConnectionBase):
     """Database connection using ORM libs with connection pooling."""
-    
+
     def __init__(self, config):
         super().__init__(config)
         self._lock = threading.Lock()
         self._session = None
-    
+
+    def _run_async(self, coro):
+        """Run async code handling both running and non-running event loops."""
+        try:
+            # If there's a running event loop, we can't use asyncio.run()
+            loop = asyncio.get_running_loop()
+            # Use nest_asyncio to allow nested loops
+            import nest_asyncio
+            nest_asyncio.apply()
+            return asyncio.run(coro)
+        except RuntimeError:
+            # No running event loop, safe to use asyncio.run()
+            return asyncio.run(coro)
+
     def connect(self) -> None:
         """Establish database connection using ORM libs."""
         if self._client is None:
@@ -31,13 +44,13 @@ class DatabaseConnection(ConnectionBase):
                     self._session = Session.from_connection_string(
                         self.config.database.connection_string
                     )
-                    asyncio.run(self._session.__aenter__())
+                    self._run_async(self._session.__aenter__())
                     self._client = self._session.backend.client
-    
+
     def disconnect(self) -> None:
         """Close database connection."""
         if self._session:
-            asyncio.run(self._session.__aexit__(None, None, None))
+            self._run_async(self._session.__aexit__(None, None, None))
             self._session = None
         self._client = None
     
