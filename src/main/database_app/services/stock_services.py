@@ -11,7 +11,7 @@ def fetch_stock_price_data(symbol: str, start_date: str = None, end_date: str = 
     try:
         stock = yf.Ticker(symbol)
         data = stock.history(start=start_date, end=end_date)
-        
+
         records = []
         for date, row in data.iterrows():
             records.append({
@@ -24,11 +24,11 @@ def fetch_stock_price_data(symbol: str, start_date: str = None, end_date: str = 
                 "volume": int(row['Volume']),
                 "fetched_at": datetime.now().isoformat(),
             })
-        
+
         return { "symbol": symbol, "records": records, "count": len(records), "status": "success" }
-        
+
     except Exception as e:
-        return f"data fetch error for {symbol}: {str(e)}"
+        return { "symbol": symbol, "records": [], "count": 0, "status": "error", "error": str(e) }
 
 def _get_event_loop():
     """Get or create event loop for the worker process"""
@@ -44,10 +44,10 @@ def _get_event_loop():
 def store_stock_price_data(price_data: Dict, collection) -> Dict:
     """Store stock prices to MongoDB - ASYNC with event loop reuse"""
     symbol = price_data.get("symbol", "UNKNOWN")
-    
+
     if price_data.get("status") != "success":
         return { "symbol": symbol, "status": "skipped", "count": 0, "reason": price_data.get("status") }
-    
+
     records = price_data.get("records", [])
     if not records:
         return { "symbol": symbol, "status": "no_records", "count": 0 }
@@ -55,14 +55,14 @@ def store_stock_price_data(price_data: Dict, collection) -> Dict:
         loop = _get_event_loop()
         result = loop.run_until_complete(_store_records_async(symbol, records, collection))
         return result
-        
+
     except Exception as e:
-        return f"data store error for {symbol}: {str(e)}"
+        return { "symbol": symbol, "status": "error", "count": 0, "error": str(e), "stored": 0 }
 
 async def _store_records_async(symbol: str, records: list, collection) -> Dict:
     """Async helper to store records"""
     inserted = 0
-    
+
     for record in records:
         try:
             await collection.update_one(
@@ -73,5 +73,5 @@ async def _store_records_async(symbol: str, records: list, collection) -> Dict:
             inserted += 1
         except Exception as e:
             continue
-    
+
     return { "symbol": symbol, "status": "success", "count": inserted, "total": len(records)}

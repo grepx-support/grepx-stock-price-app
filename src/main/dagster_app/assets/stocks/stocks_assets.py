@@ -1,5 +1,5 @@
-from assets.base_assets import StockAssetFactory
-from factors.config import cfg
+from dagster_app.assets.base_assets import StockAssetFactory
+from servers.factors.config import cfg
 
 config_prices_stocks = StockAssetFactory.create_prices_config_asset("stocks", "stocks")
 config_indicators_stocks = StockAssetFactory.create_indicators_config_asset("stocks", "stocks")
@@ -9,14 +9,14 @@ globals()["config_indicators_stocks"] = config_indicators_stocks
 # Create fetch asset
 fetch_stocks = StockAssetFactory.create_fetch_asset(
     asset_type="stocks",
-    task_name="tasks.stocks.stocks_tasks.fetch_stock_price",
+    task_name="celery_app.tasks.stocks.stocks_tasks.fetch_stock_price",
     group_name="stocks"
 )
 
 # Create store asset
 store_stocks = StockAssetFactory.create_store_asset(
     asset_type="stocks",
-    task_name="tasks.stocks.stocks_tasks.store_stock_price",
+    task_name="celery_app.tasks.stocks.stocks_tasks.store_stock_price",
     group_name="stocks"
 )
 
@@ -35,7 +35,7 @@ indicator_names = list(cfg.indicators.keys())
 # Create store_indicators asset
 store_stocks_indicators = StockAssetFactory.create_store_indicators_asset(
     asset_type="stocks",
-    task_name="tasks.stocks.stocks_tasks.store",  # the store indicator task
+    task_name="celery_app.tasks.stocks.stocks_tasks.store",  # the store indicator task
     group_name="stocks",
     indicator_names=indicator_names
 )

@@ -18,7 +18,7 @@ celery:
   synchronous: true
 
 worker:
-  pool: "prefork"  # ⚡ Changed from 'solo' to prefork for parallel execution
+  pool: "threads"  # ⚡ Using threads for Windows compatibility (prefork doesn't work on Windows)
   max_concurrent: 5  # ⚡ Increased from 10
   worker_prefetch_multiplier: 4  # ⚡ Better load balancing
   worker_max_tasks_per_child: 1000
@@ -39,17 +39,17 @@ task:
 
 tasks:
   modules:
-    - "tasks.base_tasks"
-    - "tasks.stocks.stocks_tasks"
-    - "tasks.indices.indices_tasks"
-    - "tasks.futures.futures_tasks"
+    - "celery_app.tasks.base_tasks"
+    - "celery_app.tasks.stocks.stocks_tasks"
+    - "celery_app.tasks.indices.indices_tasks"
+    - "celery_app.tasks.futures.futures_tasks"
 
   directories: []
 
 # Database configuration (ORM)
 database:
   #connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
-  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis?authSource=admin"
+  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis_test?authSource=admin"
   # connection_string: "mongodb://localhost:27017/mydb"
   # Alternative formats:
   #connection_string: "sqlite:///example.db"

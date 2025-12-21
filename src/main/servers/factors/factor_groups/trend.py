@@ -1,6 +1,6 @@
-from factors.indicators.sma import calculate_sma
-from factors.indicators.ema import calculate_ema
-from factors.config import cfg
+from servers.factors.indicators.sma import calculate_sma
+from servers.factors.indicators.ema import calculate_ema
+from servers.factors.config import cfg
 
 def sma_factors(df):
     return {

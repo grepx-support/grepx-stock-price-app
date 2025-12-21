@@ -14,8 +14,8 @@ class DagsterConnection(ConnectionBase):
         """Initialize Dagster using dagster_framework."""
         if self._client is None:
             from dagster_framework.main import create_app
-            
-            self._client = create_app(config_path=str(self.config_dir))
+
+            self._client = create_app(config_path=str(self.config_dir), config_name="dagster")
     
     def disconnect(self) -> None:
         """Close Dagster connection."""

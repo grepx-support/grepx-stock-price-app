@@ -43,7 +43,7 @@ class AppContext:
         os.environ["PROJECT_ROOT"] = str(self.root)
 
         # Add ormlib to path
-        ormlib_path = self.root.parent / "libs" / "py-orm-libs"
+        ormlib_path = self.root.parent / "libs" / "grepx-orm-libs"
         if str(ormlib_path) not in sys.path:
             sys.path.insert(0, str(ormlib_path))
 
@@ -54,8 +54,6 @@ class AppContext:
     def _initialize_connections(self) -> None:
         """Initialize connection manager."""
         self.connections = ConnectionManager(self.config, self.config_dir)
-        # Load Prefect flows
-        self.prefect_flows = load_prefect_flows()
 
     @classmethod
     def get_instance(cls) -> 'AppContext':
@@ -124,16 +122,6 @@ class AppContext:
             Dagster definitions
         """
         return cls.get_connections().get_dagster().get_definitions()
-
-    @classmethod
-    def get_prefect_flows(cls):
-        """
-        Get Prefect flows.
-
-        Returns:
-            Dictionary of Prefect flows
-        """
-        return cls.get_instance().prefect_flows
 
     @classmethod
     def reset(cls) -> None:
