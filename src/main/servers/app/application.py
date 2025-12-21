@@ -8,7 +8,9 @@ from omegaconf import OmegaConf, DictConfig
 from servers.connections.connection_manager import ConnectionManager
 
 # Prefect app import
-from price_app.src.main.prefect_app.prefect_app import load_prefect_flows
+from prefect_app.prefect_app import load_prefect_flows
+
+
 
 class AppContext:
     """

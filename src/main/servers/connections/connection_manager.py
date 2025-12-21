@@ -55,7 +55,7 @@ class ConnectionManager:
     def get_prefect_flows(self):
         """Get Prefect flows."""
         # Lazy import to avoid circular dependency
-        from price_app.src.main.prefect_app.prefect_app import load_prefect_flows
+        from prefect_app.prefect_app import load_prefect_flows
         return load_prefect_flows()
     
     def disconnect_all(self) -> None:
