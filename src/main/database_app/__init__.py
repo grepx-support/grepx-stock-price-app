@@ -1,7 +1,7 @@
 """Database app."""
 
-from .database_connection import DatabaseConnection
 from servers.connections import ConnectionFactory
+from .database_connection import DatabaseConnection
 
 ConnectionFactory.register('database', DatabaseConnection)
 

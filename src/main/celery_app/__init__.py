@@ -1,7 +1,7 @@
 """Celery app."""
 
-from .celery_connection import CeleryConnection
 from servers.connections import ConnectionFactory
+from .celery_connection import CeleryConnection
 
 ConnectionFactory.register('celery', CeleryConnection)
 

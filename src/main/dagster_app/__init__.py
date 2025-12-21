@@ -1,7 +1,7 @@
 """Dagster app."""
 
-from .dagster_connection import DagsterConnection
 from servers.connections import ConnectionFactory
+from .dagster_connection import DagsterConnection
 
 ConnectionFactory.register('dagster', DagsterConnection)
 

@@ -1,12 +1,7 @@
-"""Application initialization - generic, no specific connection knowledge."""
+"""Application - loads config and connections."""
 
 import sys
 from pathlib import Path
-
-import database_app
-import celery_app
-import dagster_app
-
 from servers.config import ConfigLoader
 from servers.connections import ConnectionManager
 from servers.app.connection_config import ConnectionConfig
@@ -25,5 +20,4 @@ conn_config = ConnectionConfig.from_config(config)
 
 
 def get_connection(conn_id: str):
-    """Get any connection by ID."""
     return connections.get(conn_id)
