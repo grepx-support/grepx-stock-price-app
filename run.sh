@@ -111,6 +111,13 @@ view_logs() {
     fi
 }
 
+# Deploy Prefect flows
+prefect_deploy() {
+  # Run Prefect deployment for price_app
+  cd "$PROJECT_ROOT" || exit 1
+  python -m price_app.src.main.prefect_app.deployments.deploy_price_flows
+}
+
 # Stop all services by port (fallback when PID file is missing)
 stop_by_ports() {
     log "Stopping all services by port..."
@@ -203,18 +210,23 @@ case "$1" in
         dagster dev -m dagster_app.dagster_app
         ;;
     
+    prefect_deploy)
+        prefect_deploy
+        ;;
+    
     *)
-        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster}"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|prefect_deploy}"
         echo ""
         echo "Commands:"
-        echo "  start      - Start all services"
-        echo "  stop       - Stop all services (tries PID first, falls back to ports)"
-        echo "  restart    - Restart all services"
-        echo "  status     - Check service status"
-        echo "  logs       - View logs: ./run.sh logs {celery|flower|dagster} [tail]"
-        echo "  kill-ports - Force stop all services by killing processes on ports 3000, 5555"
-        echo "  celery     - Start celery and flower only"
-        echo "  dagster    - Start dagster in foreground"
+        echo "  start         - Start all services"
+        echo "  stop          - Stop all services (tries PID first, falls back to ports)"
+        echo "  restart       - Restart all services"
+        echo "  status        - Check service status"
+        echo "  logs          - View logs: ./run.sh logs {celery|flower|dagster} [tail]"
+        echo "  kill-ports    - Force stop all services by killing processes on ports 3000, 5555"
+        echo "  celery        - Start celery and flower only"
+        echo "  dagster       - Start dagster in foreground"
+        echo "  prefect_deploy - Deploy Prefect flows"
         exit 1
         ;;
 esac
