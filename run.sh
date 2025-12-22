@@ -162,6 +162,8 @@ case "$1" in
         sleep 2
         start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         sleep 2
+        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
+        sleep 2
         echo ""
         check_status
         ;;

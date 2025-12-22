@@ -58,7 +58,6 @@ multitasking
 nsepython
 numpy
 omegaconf>=2.3.0
-packaging
 pandas
 pathlib_abc
 peewee
