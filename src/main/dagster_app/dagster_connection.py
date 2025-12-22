@@ -3,7 +3,7 @@
 File name matches class name (dagster_connection.py).
 """
 
-from servers.connections import ConnectionBase
+from grepx_connection_registry import ConnectionBase
 
 
 class DagsterConnection(ConnectionBase):

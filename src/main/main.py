@@ -15,7 +15,7 @@ try:
     import dagster_app
 
     from servers.config import ConfigLoader
-    from servers.connections import ConnectionManager
+    from grepx_connection_registry import ConnectionManager
     from servers.app.application import Application
     from servers.utils.logger import get_logger
     

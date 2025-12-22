@@ -7,7 +7,7 @@ File name matches class name.
 import sys
 from pathlib import Path
 from servers.config import ConfigLoader
-from servers.connections import ConnectionManager
+from grepx_connection_registry import ConnectionManager
 from servers.utils.logger import AppLogger
 
 
@@ -35,6 +35,11 @@ class Application:
         ormlib_path = self.root.parent / "libs" / "grepx-orm-libs" / "src"
         if str(ormlib_path) not in sys.path:
             sys.path.insert(0, str(ormlib_path))
+        
+        # Add connection registry libs to path
+        connection_registry_path = self.root.parent / "libs" / "grepx-connection-registry" / "src"
+        if str(connection_registry_path) not in sys.path:
+            sys.path.insert(0, str(connection_registry_path))
         
         # Load configuration
         try:

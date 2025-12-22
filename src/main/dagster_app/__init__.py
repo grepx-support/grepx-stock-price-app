@@ -1,6 +1,6 @@
 """Dagster app."""
 
-from servers.connections import ConnectionFactory
+from grepx_connection_registry import ConnectionFactory
 from .dagster_connection import DagsterConnection
 
 ConnectionFactory.register('dagster', DagsterConnection)
