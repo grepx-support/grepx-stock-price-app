@@ -1,6 +1,5 @@
 # servers/assets/base_assets.py
 from dagster import asset, get_dagster_logger, AssetIn
-from servers.app.application import AppContext
 from typing import Dict, List
 from servers.factors.config import cfg
 from omegaconf import OmegaConf
@@ -47,8 +46,11 @@ class StockAssetFactory:
             start_date = prices_config["start_date"]
             end_date = prices_config["end_date"]
 
+            from main import get_connection
+            
+            celery_app = get_connection("primary_celery").get_client()
             for symbol in symbols:
-                result = AppContext.get_celery_app().send_task(task_name, args=[symbol, start_date, end_date])
+                result = celery_app.send_task(task_name, args=[symbol, start_date, end_date])
                 task_ids[symbol] = result.id
                 logger.info(f"[{asset_type.upper()}] Queued fetch: {symbol} -> {result.id}")
 
@@ -65,15 +67,18 @@ class StockAssetFactory:
         )
         def store_asset(fetch_task_ids: Dict[str, str]) -> Dict:
             logger = get_dagster_logger()
+            from main import get_connection
+            
+            celery_app = get_connection("primary_celery").get_client()
             store_results = {}
             for symbol, task_id in fetch_task_ids.items():
                 try:
-                    price_data = AppContext.get_celery_app().AsyncResult(task_id).get(timeout=120)
+                    price_data = celery_app.AsyncResult(task_id).get(timeout=120)
                     if not price_data or price_data.get("status") != "success":
                         logger.warning(f"[{asset_type.upper()}] Fetch failed for {symbol}")
                         store_results[symbol] = None
                         continue
-                    result = AppContext.get_celery_app().send_task(task_name, args=[price_data, symbol])
+                    result = celery_app.send_task(task_name, args=[price_data, symbol])
                     store_results[symbol] = result.id
                     logger.info(f"[{asset_type.upper()}] Queued store: {symbol} -> {result.id}")
                 except Exception as e:
@@ -94,6 +99,9 @@ class StockAssetFactory:
         )
         def indicator_asset(fetch_task_ids: Dict[str, str], indicators_config: Dict) -> List:
             logger = get_dagster_logger()
+            from main import get_connection
+            
+            celery_app = get_connection("primary_celery").get_client()
             results = []
             symbols = cfg.asset_types[asset_type].symbols  # could also come from prices_config if you add it
             indicator_config = indicators_config.get(indicator_name, {})
@@ -103,9 +111,9 @@ class StockAssetFactory:
                 if not task_id:
                     continue
                 try:
-                    price_data = AppContext.get_celery_app().AsyncResult(task_id).get(timeout=120)
+                    price_data = celery_app.AsyncResult(task_id).get(timeout=120)
                     if price_data.get("status") == "success":
-                        result = AppContext.get_celery_app().send_task(
+                        result = celery_app.send_task(
                             f'celery_app.tasks.{asset_type}.{asset_type}_tasks.compute',
                             args=[symbol, indicator_name, price_data["records"], indicator_config],
                         )
@@ -134,6 +142,9 @@ class StockAssetFactory:
         )
         def store_indicators_asset(**kwargs) -> List:
             logger = get_dagster_logger()
+            from main import get_connection
+            
+            celery_app = get_connection("primary_celery").get_client()
             store_results = []
             store_task_name = f"celery_app.tasks.{asset_type}.{asset_type}_tasks.store"
 
@@ -146,8 +157,8 @@ class StockAssetFactory:
                     factor = item["factor"]
                     compute_task_id = item["task_id"]
                     try:
-                        factor_data = AppContext.get_celery_app().AsyncResult(compute_task_id).get(timeout=180)
-                        result = AppContext.get_celery_app().send_task(
+                        factor_data = celery_app.AsyncResult(compute_task_id).get(timeout=180)
+                        result = celery_app.send_task(
                             store_task_name,
                             args=[symbol, factor, factor_data]
                         )

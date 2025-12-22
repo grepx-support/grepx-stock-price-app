@@ -1,6 +1,8 @@
-"""Celery application module."""
+"""Celery app."""
 
-# Don't import at module level to avoid circular dependencies
-# Celery CLI imports directly: celery_app.celery_app:app
-__all__ = []
+from grepx_connection_registry import ConnectionFactory
+from .celery_connection import CeleryConnection
 
+ConnectionFactory.register('celery', CeleryConnection)
+
+__all__ = ["CeleryConnection"]

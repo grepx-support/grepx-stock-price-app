@@ -25,7 +25,7 @@ start_service() {
     local name=$1
     local cmd=$2
     local log_file="$LOG_DIR/${name}.log"
-    
+
     if [ -f "$PID_FILE" ] && grep -q "^${name}:" "$PID_FILE" 2>/dev/null; then
         local old_pid=$(grep "^${name}:" "$PID_FILE" | cut -d: -f2)
         if is_running "$old_pid"; then
@@ -33,11 +33,12 @@ start_service() {
             return 0
         fi
     fi
-    
+
     log "Starting $name..."
     # Ensure PYTHONPATH is set in the command for background processes
     eval "PYTHONPATH=\"$PYTHONPATH\" $cmd >> $log_file 2>&1 &"
     local pid=$!
+
     echo "${name}:${pid}" >> "$PID_FILE"
     log "$name started (PID: $pid)"
 }
@@ -48,7 +49,7 @@ stop_service() {
     if [ ! -f "$PID_FILE" ]; then
         return 0
     fi
-    
+
     local pid=$(grep "^${name}:" "$PID_FILE" 2>/dev/null | cut -d: -f2)
     if [ -n "$pid" ] && is_running "$pid"; then
         log "Stopping $name (PID: $pid)..."
@@ -64,10 +65,10 @@ stop_service() {
 check_status() {
     log "Checking service status..."
     echo ""
-    
+
     local services=("celery" "flower" "dagster")
     local all_running=true
-    
+
     for service in "${services[@]}"; do
         if [ -f "$PID_FILE" ]; then
             local pid=$(grep "^${service}:" "$PID_FILE" 2>/dev/null | cut -d: -f2)
@@ -82,7 +83,7 @@ check_status() {
             all_running=false
         fi
     done
-    
+
     echo ""
     if [ "$all_running" = true ]; then
         log "All services are running"
@@ -97,12 +98,12 @@ check_status() {
 view_logs() {
     local service=$1
     local log_file="$LOG_DIR/${service}.log"
-    
+
     if [ ! -f "$log_file" ]; then
         log_error "Log file not found: $log_file"
         return 1
     fi
-    
+
     if [ "$2" = "tail" ] || [ "$2" = "follow" ]; then
         log "Following $service logs (Ctrl+C to stop)..."
         tail -f "$log_file"
@@ -121,23 +122,23 @@ prefect_deploy() {
 # Stop all services by port (fallback when PID file is missing)
 stop_by_ports() {
     log "Stopping all services by port..."
-    
+
     # Kill processes by port
     log "Killing processes on port 3000 (Dagster)..."
     kill_port 3000
-    
+
     log "Killing processes on port 5555 (Flower)..."
     kill_port 5555
-    
+
     # Also try to kill by process name as fallback
     log "Killing processes by name..."
     pkill -f "celery.*worker" 2>/dev/null || true
     pkill -f "flower" 2>/dev/null || true
     pkill -f "dagster" 2>/dev/null || true
-    
+
     # Clean up PID file if it exists
     [ -f "$PID_FILE" ] && rm -f "$PID_FILE" || true
-    
+
     log "All services stopped by port"
 }
 
@@ -145,16 +146,16 @@ stop_by_ports() {
 case "$1" in
     start)
         log "Starting all services..."
-        start_service "celery" "celery -A celery_app.celery_app:app worker --loglevel=info"
+        start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         sleep 2
-        start_service "flower" "celery -A celery_app.celery_app:app flower --port=5555"
+        start_service "flower" "celery -A celery_main:app flower --port=5555"
         sleep 2
-        start_service "dagster" "dagster dev -m dagster_app.dagster_app"
+        start_service "dagster" "dagster dev -m dagster_main"
         sleep 2
         echo ""
         check_status
         ;;
-    
+
     stop)
         log "Stopping all services..."
         # Try to stop by PID first
@@ -176,22 +177,22 @@ case "$1" in
         fi
         log "All services stopped"
         ;;
-    
+
     kill-ports|stop-ports)
         stop_by_ports
         ;;
-    
+
     restart)
         log "Restarting all services..."
         $0 stop
         sleep 2
         $0 start
         ;;
-    
+
     status)
         check_status
         ;;
-    
+
     logs)
         if [ -z "$2" ]; then
             log_error "Usage: ./run.sh logs {celery|flower|dagster} [tail|follow]"
@@ -199,26 +200,31 @@ case "$1" in
         fi
         view_logs "$2" "$3"
         ;;
-    
+
     celery)
-        start_service "celery" "celery -A celery_app.celery_app:app worker --loglevel=info"
-        start_service "flower" "celery -A celery_app.celery_app:app flower --port=5555"
+        start_service "celery" "celery -A celery_main:app worker --loglevel=info"
+        start_service "flower" "celery -A celery_main:app flower --port=5555"
         ;;
-    
+
     dagster)
         cd src/main
-        dagster dev -m dagster_app.dagster_app
+        dagster dev -m dagster_main
         ;;
-    
+
+    flask)
+        cd src/main
+        flask --app flask_main:app run
+        ;;
+
     prefect_deploy)
         prefect_deploy
         ;;
-    
+
     *)
-        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|prefect_deploy}"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect_deploy}"
         echo ""
         echo "Commands:"
-        echo "  start         - Start all services"
+        echo "  start         - Start all services (Celery, Flower, Dagster)"
         echo "  stop          - Stop all services (tries PID first, falls back to ports)"
         echo "  restart       - Restart all services"
         echo "  status        - Check service status"
@@ -226,6 +232,7 @@ case "$1" in
         echo "  kill-ports    - Force stop all services by killing processes on ports 3000, 5555"
         echo "  celery        - Start celery and flower only"
         echo "  dagster       - Start dagster in foreground"
+        echo "  flask         - Start flask in foreground"
         echo "  prefect_deploy - Deploy Prefect flows"
         exit 1
         ;;

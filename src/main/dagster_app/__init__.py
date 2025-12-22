@@ -1,6 +1,8 @@
-"""Dagster application module."""
+"""Dagster app."""
 
-# Don't import at module level to avoid circular dependencies
-# Dagster CLI imports directly: dagster_app.dagster_app:defs
-__all__ = []
+from grepx_connection_registry import ConnectionFactory
+from .dagster_connection import DagsterConnection
 
+ConnectionFactory.register('dagster', DagsterConnection)
+
+__all__ = ["DagsterConnection"]

@@ -1,57 +1,29 @@
-# Price App Configuration
-
-# App metadata
 app:
-  name: "servers"
+  name: "price_app"
+  environment: "local"
   version: "1.0.0"
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "price_app.log"
+    format: "[%(asctime)s] [%(levelname)-8s] [%(name)-20s] [%(filename)s:%(lineno)d] %(message)s"
 
-# Celery configuration
-celery:
-  broker_url: "redis://127.0.0.1:6379/0"
-  result_backend: "redis://127.0.0.1:6379/1"
-  task_serializer: "json"
-  result_serializer: "json"
-  accept_content:
-    - json
-  timezone: "Asia/Kolkata"
-  enable_utc: true
-  synchronous: true
+connections:
+  - id: primary_db
+    type: database
+    enabled: true
+    config_file: database.yaml
+  
+  - id: primary_celery
+    type: celery
+    enabled: true
+    config_file: celery.yaml
+  
+  - id: primary_dagster
+    type: dagster
+    enabled: true
+    config_file: dagster.yaml
 
-worker:
-  pool: "threads"  # ⚡ Using threads for Windows compatibility (prefork doesn't work on Windows)
-  max_concurrent: 5  # ⚡ Increased from 10
-  worker_prefetch_multiplier: 4  # ⚡ Better load balancing
-  worker_max_tasks_per_child: 1000
-
-
-task:
-  track_started: true
-  time_limit: 600  # ⚡ Reduced from 1800s (was too long)
-  soft_time_limit: 500
-  # ⚡ NEW: Task compression to reduce network I/O
-  task_compression: "gzip"
-  # ⚡ NEW: Ignore results if not needed
-  task_ignore_result: false
-  # ⚡ NEW: Reduce retry attempts
-  autoretry_for: [Exception]
-  max_retries: 2
-  default_retry_delay: 5
-
-tasks:
-  modules:
-    - "celery_app.tasks.base_tasks"
-    - "celery_app.tasks.stocks.stocks_tasks"
-    - "celery_app.tasks.indices.indices_tasks"
-    - "celery_app.tasks.futures.futures_tasks"
-
-  directories: []
-
-# Database configuration (ORM)
-database:
-  #connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
-  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis_test?authSource=admin"
-  # connection_string: "mongodb://localhost:27017/mydb"
-  # Alternative formats:
-  #connection_string: "sqlite:///example.db"
-  # PostgreSQL: "postgresql://user:pass@localhost:5432/stock_analysis"
-  # MongoDB Local: "mongodb://admin:password123@localhost:27017/stock_analysis"
+  - id: secondary_db
+    type: database
+    enabled: false
+    config_file: database_secondary.yaml
