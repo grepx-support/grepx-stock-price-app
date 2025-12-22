@@ -65,8 +65,8 @@ stop_service() {
 check_status() {
     log "Checking service status..."
     echo ""
-
-    local services=("celery" "flower" "dagster")
+    
+    local services=("celery" "flower" "dagster" "prefect-worker")
     local all_running=true
 
     for service in "${services[@]}"; do
@@ -119,6 +119,14 @@ prefect_deploy() {
   python -m price_app.src.main.prefect_app.deployments.deploy_price_flows
 }
 
+# Start Prefect worker
+prefect_worker() {
+  # Start Prefect worker for price-pool
+  cd "$PROJECT_ROOT" || exit 1
+  export PREFECT_API_URL="http://127.0.0.1:4200/api"
+  python -m prefect worker start --pool price-pool
+}
+
 # Stop all services by port (fallback when PID file is missing)
 stop_by_ports() {
     log "Stopping all services by port..."
@@ -152,6 +160,8 @@ case "$1" in
         sleep 2
         start_service "dagster" "dagster dev -m dagster_main"
         sleep 2
+        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
+        sleep 2
         echo ""
         check_status
         ;;
@@ -162,6 +172,7 @@ case "$1" in
         stop_service "celery"
         stop_service "flower"
         stop_service "dagster"
+        stop_service "prefect-worker"
         # Fallback: kill by ports if PID file is missing or empty
         if [ ! -f "$PID_FILE" ] || [ ! -s "$PID_FILE" ]; then
             log "PID file missing or empty, using port-based kill..."
@@ -171,6 +182,7 @@ case "$1" in
             pkill -f "celery.*worker" 2>/dev/null || true
             pkill -f "flower" 2>/dev/null || true
             pkill -f "dagster" 2>/dev/null || true
+            pkill -f "prefect.*worker" 2>/dev/null || true
             # Kill processes on ports as additional cleanup
             kill_port 3000
             kill_port 5555
@@ -195,7 +207,7 @@ case "$1" in
 
     logs)
         if [ -z "$2" ]; then
-            log_error "Usage: ./run.sh logs {celery|flower|dagster} [tail|follow]"
+            log_error "Usage: ./run.sh logs {celery|flower|dagster|prefect} [tail|follow]"
             exit 1
         fi
         view_logs "$2" "$3"
@@ -204,36 +216,41 @@ case "$1" in
     celery)
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         start_service "flower" "celery -A celery_main:app flower --port=5555"
+        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         ;;
 
     dagster)
         cd src/main
         dagster dev -m dagster_main
         ;;
-
-    flask)
-        cd src/main
-        flask --app flask_main:app run
+    
+    prefect)
+        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         ;;
-
+    
     prefect_deploy)
         prefect_deploy
         ;;
-
+    
+    prefect_worker)
+        prefect_worker
+        ;;
+    
     *)
-        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect_deploy}"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|prefect|prefect_deploy|prefect_worker}"
         echo ""
         echo "Commands:"
         echo "  start         - Start all services (Celery, Flower, Dagster)"
         echo "  stop          - Stop all services (tries PID first, falls back to ports)"
         echo "  restart       - Restart all services"
         echo "  status        - Check service status"
-        echo "  logs          - View logs: ./run.sh logs {celery|flower|dagster} [tail]"
+        echo "  logs          - View logs: ./run.sh logs {celery|flower|dagster|prefect} [tail]"
         echo "  kill-ports    - Force stop all services by killing processes on ports 3000, 5555"
         echo "  celery        - Start celery and flower only"
         echo "  dagster       - Start dagster in foreground"
-        echo "  flask         - Start flask in foreground"
+        echo "  prefect       - Start Prefect worker only"
         echo "  prefect_deploy - Deploy Prefect flows"
+        echo "  prefect_worker - Start Prefect worker for price-pool"
         exit 1
         ;;
 esac
