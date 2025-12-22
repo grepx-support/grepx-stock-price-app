@@ -57,7 +57,7 @@ multidict
 multitasking
 nsepython
 numpy
-omegaconf
+omegaconf>=2.3.0
 packaging
 pandas
 pathlib_abc
@@ -83,7 +83,7 @@ python-dotenv
 pytz
 PyYAML
 redis
-requests
+requests>=2.28.0
 requests-toolbelt
 rich
 scipy
@@ -114,4 +114,4 @@ wcwidth
 websockets
 yarl
 yfinance
-prefect
+prefect>=3.0.0

@@ -224,6 +224,11 @@ case "$1" in
         dagster dev -m dagster_main
         ;;
     
+    flask)
+        cd src/main
+        flask --app flask_main:app run
+        ;;
+    
     prefect)
         start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         ;;
@@ -237,7 +242,7 @@ case "$1" in
         ;;
     
     *)
-        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|prefect|prefect_deploy|prefect_worker}"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect|prefect_deploy|prefect_worker}"
         echo ""
         echo "Commands:"
         echo "  start         - Start all services (Celery, Flower, Dagster)"
@@ -248,6 +253,7 @@ case "$1" in
         echo "  kill-ports    - Force stop all services by killing processes on ports 3000, 5555"
         echo "  celery        - Start celery and flower only"
         echo "  dagster       - Start dagster in foreground"
+        echo "  flask         - Start flask in foreground"
         echo "  prefect       - Start Prefect worker only"
         echo "  prefect_deploy - Deploy Prefect flows"
         echo "  prefect_worker - Start Prefect worker for price-pool"
