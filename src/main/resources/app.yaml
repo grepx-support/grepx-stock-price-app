@@ -2,11 +2,10 @@ app:
   name: "price_app"
   environment: "local"
   version: "1.0.0"
-
-defaults:
-  database: "primary_db"
-  celery: "primary_celery"
-  dagster: "primary_dagster"
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "price_app.log"
+    format: "[%(asctime)s] [%(levelname)-8s] [%(name)-20s] [%(filename)s:%(lineno)d] %(message)s"
 
 connections:
   - id: primary_db
@@ -23,7 +22,7 @@ connections:
     type: dagster
     enabled: true
     config_file: dagster.yaml
-  
+
   - id: secondary_db
     type: database
     enabled: false

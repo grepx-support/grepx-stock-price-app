@@ -39,14 +39,12 @@ class TaskFactory:
         """Create a store price task"""
         def store_task(self, price_data, symbol):
             try:
-                from servers.app.application import AppContext
+                from main import get_collection
                 from database_app.services.naming import naming
 
                 db_name = naming.get_analysis_db_name(asset_type)
-
                 collection_name = naming.get_price_collection_name(asset_type, symbol)
-                #db = AppContext.get_database(db_name)
-                collection = AppContext.get_collection(db_name, collection_name)
+                collection = get_collection(db_name, collection_name)
 
 
                 logger.info(f"[{asset_type.upper()}] Storing {symbol} to {db_name}.{collection_name}")
@@ -78,14 +76,12 @@ class TaskFactory:
     def create_store_indicator_task(service_func, asset_type: str):
         def store_task(self, symbol, factor, factor_data):
             try:
-                from servers.app.application import AppContext
+                from main import get_collection
                 from database_app.services.naming import naming
 
                 db_name = naming.get_analysis_db_name(asset_type)
                 collection_name = naming.get_indicator_collection_name(asset_type, symbol, factor)
-
-                #db = AppContext.get_database(db_name)
-                collection = AppContext.get_collection(db_name, collection_name)
+                collection = get_collection(db_name, collection_name)
 
                 logger.info(f"[{asset_type.upper()}] Storing {factor} for {symbol} → {db_name}.{collection_name}")
 

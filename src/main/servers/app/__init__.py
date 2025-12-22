@@ -1,17 +1,5 @@
-"""App package - completely generic."""
+"""App package - Application class only."""
 
-from .application import (
-    get_connection,
-    connections,
-    config,
-    conn_config,
-)
-from .connection_config import ConnectionConfig
+from .application import Application
 
-__all__ = [
-    "get_connection",
-    "connections",
-    "config",
-    "conn_config",
-    "ConnectionConfig",
-]
+__all__ = ["Application"]

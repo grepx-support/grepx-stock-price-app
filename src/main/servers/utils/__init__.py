@@ -1,5 +1,5 @@
 """Utils package for servers."""
 
-# Import utility functions when needed
+from .logger import AppLogger, get_logger
 
-__all__ = []
+__all__ = ["AppLogger", "get_logger"]

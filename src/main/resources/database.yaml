@@ -1,5 +1,5 @@
 database:
-  connection_string: "mongodb://localhost:27017"
+  connection_string: "mongodb://localhost:27017/price_app"
   pool_size: 10
   min_pool_size: 2
   max_pool_size: 50
