@@ -1,6 +1,6 @@
 """Celery connection."""
 
-from servers.connections import ConnectionBase
+from grepx_connection_registry import ConnectionBase
 
 
 class CeleryConnection(ConnectionBase):

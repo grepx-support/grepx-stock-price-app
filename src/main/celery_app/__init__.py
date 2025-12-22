@@ -1,6 +1,6 @@
 """Celery app."""
 
-from servers.connections import ConnectionFactory
+from grepx_connection_registry import ConnectionFactory
 from .celery_connection import CeleryConnection
 
 ConnectionFactory.register('celery', CeleryConnection)
