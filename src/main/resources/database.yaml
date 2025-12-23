@@ -1,8 +1,25 @@
 database:
-  connection_string: "mongodb://localhost:27017/price_app"
+  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis_test?authSource=admin"
   pool_size: 10
   min_pool_size: 2
   max_pool_size: 50
   timeout: 5000
   retry_writes: true
   w: "majority"
+
+backends:
+  mongodb:
+    enabled: true
+    connection_string: "mongodb://admin:password123@localhost:27017?authSource=admin"
+    databases_to_delete:
+      - futures_analysis
+      - stocks_analysis
+      - indices_analysis
+  sqlite:
+    enabled: false  # ← Won't run if false
+    connection_string: "sqlite:///analytics.db"
+    tables_to_delete: null
+  postgresql:
+    enabled: false  # ← Won't run if false
+    connection_string: "postgresql://postgres:postgres@localhost:5432/analytics"
+    tables_to_delete: null
