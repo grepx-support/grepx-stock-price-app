@@ -12,5 +12,5 @@ if __name__ == "__main__":
         work_pool_name="price-pool",
         tags=["price", "etl", "prefect"],
     )
-
+    
     print("Successfully deployed price_etl_flow")

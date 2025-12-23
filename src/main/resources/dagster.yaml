@@ -1,16 +1,32 @@
 dagster:
   home: "dagster_home"
   module_name: "dagster_app"
-  
+
   assets:
     modules:
-      - "dagster_app.assets.stocks"
-      - "dagster_app.assets.indices"
-      - "dagster_app.assets.futures"
+      - "dagster_app.assets.stocks.stocks_assets"
+      - "dagster_app.assets.indices.indices_assets"
+      - "dagster_app.assets.futures.futures_assets"
       - "dagster_app.assets.cleanup"
-    
-    
-  
+    directories: []
+
+  ops:  
+    modules: []  
+
+  jobs:
+    - name: "stocks_pipeline"
+      assets:
+        - "dagster_app.assets.stocks.stocks_assets"
+    - name: "indices_pipeline"
+      assets:
+        - "dagster_app.assets.indices.indices_assets"
+    - name: "futures_pipeline"
+      assets:
+        - "dagster_app.assets.futures.futures_assets"
+    - name: "cleanup_pipeline"
+      assets:
+        - "dagster_app.assets.cleanup"
+
   resources:
     database:
       enabled: true

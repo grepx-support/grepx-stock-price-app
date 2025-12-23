@@ -1,44 +1,23 @@
-"""Dagster entry point.
-
-Usage: dagster dev -m dagster_main
-"""
-
-# Import apps to register connection types
-import database_app
-import celery_app
-import dagster_app
-from dagster import Definitions, load_assets_from_modules
-from dagster_app.assets.stocks import stocks_assets
-from dagster_app.assets.indices import indices_assets
-from dagster_app.assets.futures import futures_assets
-from dagster_app.assets import cleanup
 from servers.utils.logger import get_logger
+from main import get_connection
+from dagster import Definitions
+from dagster_framework.dagster_app import DagsterApp
 
 logger = get_logger(__name__)
-
 logger.info("Initializing Dagster application...")
 
 try:
-    logger.debug("Loading assets from modules...")
+    app_config = get_connection("primary_dagster").get_client()
 
-    # Load assets from all asset modules
-    all_assets = load_assets_from_modules([
-        stocks_assets,
-        indices_assets,
-        futures_assets,
-        cleanup
-    ])
-    logger.info(f"Loaded {len(all_assets)} assets")
+    # Initialize your DagsterApp using the config
+    dagster_app = DagsterApp(config=app_config['config']['dagster'])
 
-    logger.debug("Creating Dagster Definitions...")
-    defs = Definitions(assets=all_assets)
+    # Get Dagster definitions
+    defs = dagster_app.definitions
+
     logger.info("Dagster application initialized successfully")
-    logger.debug(f"Definitions created with {len(all_assets)} assets")
+    logger.debug(f"Loaded {len(defs.assets)} assets and {len(defs.jobs)} jobs")
 
 except Exception as e:
     logger.error(f"Failed to initialize Dagster application: {e}", exc_info=True)
-    # Create empty definitions as fallback so Dagster can still load the module
-    # This allows Dagster UI to show the error instead of failing to load entirely
-    logger.warning("Creating empty Definitions as fallback due to initialization error")
-    defs = Definitions(assets=[])
-    # Don't raise - let Dagster UI show the error through logs
+    defs = Definitions()  # fallback

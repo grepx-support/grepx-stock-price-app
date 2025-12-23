@@ -41,61 +41,52 @@ def cleanup_databases():
 
     results = {}
 
-    # Detect backend type from configuration
-    connection_string = database_config.get("connection_string", "")
-    host = database_config.get("host")
-    port = database_config.get("port")
-    username = database_config.get("username")
-    password = database_config.get("password")
+    # Get active backend from configuration
+    active_backend = database_config.get("active_backend", "postgresql")
+    backend_config = database_config.get(active_backend, {})
     databases_to_cleanup = ["stocks_analysis", "indices_analysis", "futures_analysis"]
 
     try:
-        # Determine which backend is configured
-        if connection_string:
-            if "mongodb" in connection_string.lower():
-                logger.info("[CLEANUP] MongoDB backend detected")
-                result = asyncio.run(
-                    cleanup_mongodb_databases(
-                        connection_string=connection_string,
-                        databases_to_delete=databases_to_cleanup,
-                    )
+        if active_backend == "mongodb":
+            logger.info("[CLEANUP] MongoDB backend detected")
+            connection_string = backend_config.get("connection_string", "mongodb://localhost:27017/")
+            result = asyncio.run(
+                cleanup_mongodb_databases(
+                    connection_string=connection_string,
+                    databases_to_delete=databases_to_cleanup,
                 )
-                results["mongodb"] = result
-            elif "postgresql" in connection_string.lower():
-                logger.info("[CLEANUP] PostgreSQL backend detected")
-                # Parse connection string or use parameters
-                result = asyncio.run(
-                    cleanup_postgresql_databases(
-                        host=host or "localhost",
-                        port=port or 5432,
-                        username=username or "postgres",
-                        password=password or "",
-                        databases_to_delete=databases_to_cleanup,
-                    )
-                )
-                results["postgresql"] = result
-            elif "sqlite" in connection_string.lower():
-                logger.info("[CLEANUP] SQLite backend detected")
-                result = asyncio.run(
-                    cleanup_sqlite_files(databases_to_delete=databases_to_cleanup)
-                )
-                results["sqlite"] = result
-        elif host and port and username:
-            # Parameters-based config (PostgreSQL)
-            logger.info("[CLEANUP] PostgreSQL backend detected (parameter-based)")
+            )
+            results["mongodb"] = result
+
+        elif active_backend == "postgresql":
+            logger.info("[CLEANUP] PostgreSQL backend detected")
+            # Get connection parameters
+            host = backend_config.get("host", "localhost")
+            port = backend_config.get("port", 5432)
+            username = backend_config.get("username", "postgres")
+            password = backend_config.get("password", "")
+
             result = asyncio.run(
                 cleanup_postgresql_databases(
                     host=host,
                     port=port,
                     username=username,
-                    password=password or "",
+                    password=password,
                     databases_to_delete=databases_to_cleanup,
                 )
             )
             results["postgresql"] = result
+
+        elif active_backend == "sqlite":
+            logger.info("[CLEANUP] SQLite backend detected")
+            result = asyncio.run(
+                cleanup_sqlite_files(databases_to_delete=databases_to_cleanup)
+            )
+            results["sqlite"] = result
+
         else:
-            logger.warning("[CLEANUP] No database backend configuration found")
-            return {"error": "No database configuration found in database.yaml"}
+            logger.warning(f"[CLEANUP] Unknown backend: {active_backend}")
+            return {"error": f"Unknown backend: {active_backend}"}
 
     except Exception as e:
         logger.error(f"[CLEANUP] Error during cleanup: {e}", exc_info=True)
