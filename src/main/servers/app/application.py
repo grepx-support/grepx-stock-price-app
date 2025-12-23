@@ -9,6 +9,8 @@ from pathlib import Path
 from servers.config import ConfigLoader
 from grepx_connection_registry import ConnectionManager
 from servers.utils.logger import AppLogger
+# Prefect app import
+from prefect_app.prefect_app import load_prefect_flows
 
 
 class Application:
@@ -16,12 +18,12 @@ class Application:
     
     _instance = None
     _initialized = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         """Initialize application (only once)."""
         if self._initialized:
@@ -40,6 +42,11 @@ class Application:
         connection_registry_path = self.root.parent / "libs" / "grepx-connection-registry" / "src"
         if str(connection_registry_path) not in sys.path:
             sys.path.insert(0, str(connection_registry_path))
+        
+        # Add Prefect framework to path
+        prefect_framework_path = self.root.parent / "libs" / "prefect_framework" / "src"
+        if str(prefect_framework_path) not in sys.path:
+            sys.path.insert(0, str(prefect_framework_path))
         
         # Load configuration
         try:
@@ -100,5 +107,30 @@ class Application:
         except Exception as e:
             self.logger.error(f"Failed to get collection '{db_name}.{collection_name}': {e}", exc_info=True)
             raise
-
-
+    
+    def get_prefect_flows(self):
+        """Get Prefect flows through connection manager."""
+        try:
+            self.logger.debug("Getting Prefect flows through connection manager...")
+            prefect_conn = self.get_connection("prefect_flows")
+            flows = prefect_conn.get_flows()
+            self.logger.info(f"Retrieved {len(flows)} Prefect flows successfully")
+            return flows
+        except Exception as e:
+            self.logger.error(f"Failed to get Prefect flows: {e}", exc_info=True)
+            raise
+    
+    def get_prefect_flow(self, flow_name: str):
+        """Get a specific Prefect flow by name."""
+        try:
+            self.logger.debug(f"Getting Prefect flow: {flow_name}")
+            prefect_conn = self.get_connection("prefect_flows")
+            flow = prefect_conn.get_flow(flow_name)
+            if flow is None:
+                self.logger.warning(f"Prefect flow '{flow_name}' not found")
+            else:
+                self.logger.debug(f"Prefect flow '{flow_name}' retrieved successfully")
+            return flow
+        except Exception as e:
+            self.logger.error(f"Failed to get Prefect flow '{flow_name}': {e}", exc_info=True)
+            raise

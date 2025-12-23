@@ -13,6 +13,12 @@ try:
     import database_app
     import celery_app
     import dagster_app
+    import prefect_app
+    # Import the Prefect framework
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent / "libs" / "prefect_framework" / "src"))
+    import prefect_framework
 
     from servers.config import ConfigLoader
     from grepx_connection_registry import ConnectionManager
@@ -25,7 +31,7 @@ try:
     
     logger.info("Main module initialized")
     logger.debug("Application singleton created successfully")
-    logger.debug("Connection types registered: database, celery, dagster")
+    logger.debug("Connection types registered: database, celery, dagster, prefect")
     
     # Convenient exports
     get_connection = app.get_connection
@@ -33,7 +39,7 @@ try:
     get_collection = app.get_collection
     config = app.config
     connections = app.connections
-    
+
 except Exception as e:
     print(f"ERROR: Failed to initialize application: {e}")
     import traceback

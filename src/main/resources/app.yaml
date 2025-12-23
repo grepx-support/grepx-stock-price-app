@@ -27,3 +27,8 @@ connections:
     type: database
     enabled: false
     config_file: database_secondary.yaml
+
+  - id: prefect_flows
+    type: prefect
+    enabled: true
+    config_file: prefect.yaml
