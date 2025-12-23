@@ -7,6 +7,9 @@ dagster:
       - "dagster_app.assets.stocks"
       - "dagster_app.assets.indices"
       - "dagster_app.assets.futures"
+      - "dagster_app.assets.cleanup"
+    
+    
   
   resources:
     database:

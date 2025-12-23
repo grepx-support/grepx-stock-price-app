@@ -31,6 +31,7 @@ try:
     get_connection = app.get_connection
     get_database = app.get_database
     get_collection = app.get_collection
+    get_app = lambda: app  # Return the application singleton
     config = app.config
     connections = app.connections
     

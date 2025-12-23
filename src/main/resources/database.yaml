@@ -1,8 +1,52 @@
 database:
-  connection_string: "mongodb://localhost:27017/price_app"
+  # ============================================================================
+  # ACTIVE BACKEND - Change 'active_backend' to switch databases
+  # Valid values: sqlite, mongodb, postgresql
+  # ============================================================================
+  active_backend: postgresql
+
+  # ============================================================================
+  # SQLite Configuration (File-based, no server required)
+  # ============================================================================
+  sqlite:
+    connection_string: "sqlite:///./data/stocks_analysis.db"
+    database: "stocks_analysis"
+
+  # ============================================================================
+  # MongoDB Configuration (Local or Atlas Cloud)
+  # ============================================================================
+  mongodb:
+    # For MongoDB Local:
+    connection_string: "mongodb://localhost:27017/"
+    database: "admin"
+
+    # For MongoDB Atlas (Cloud), uncomment and use:
+    # connection_string: "mongodb+srv://username:password@cluster-name.mongodb.net/"
+    # database: "admin"
+
+  # ============================================================================
+  # PostgreSQL Configuration (RECOMMENDED for production)
+  # Supports automatic database creation for:
+  #   - stocks_analysis
+  #   - indices_analysis
+  #   - futures_analysis
+  # ============================================================================
+  postgresql:
+    # Option 1: Using parameters (BEST for passwords with special characters):
+    host: "localhost"
+    port: 5432
+    username: "postgres"
+    password: "System@123"
+    database: "postgres"
+
+    # Option 2: Using connection string (uncomment to use):
+    # connection_string: "postgresql://postgres:password@localhost:5432/postgres"
+    # database: "postgres"
+
+  # ============================================================================
+  # Global Connection Settings
+  # ============================================================================
   pool_size: 10
-  min_pool_size: 2
-  max_pool_size: 50
   timeout: 5000
   retry_writes: true
   w: "majority"

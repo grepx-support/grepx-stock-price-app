@@ -56,6 +56,11 @@ columns:
   open: "open"
   volume: "volume"
 
+database_naming:
+  stocks: "stocks_analysis"
+  indices: "indices_analysis"
+  futures: "futures_analysis"
+
 naming_convention:
   case_mode: lower
   separator: "_"

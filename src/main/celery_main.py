@@ -6,6 +6,11 @@ Usage: celery -A celery_main:app worker
 import database_app
 import celery_app
 
+# Import task modules to register tasks with Celery
+from celery_app.tasks.stocks import stocks_tasks
+from celery_app.tasks.indices import indices_tasks
+from celery_app.tasks.futures import futures_tasks
+
 from main import get_connection
 from servers.utils.logger import get_logger
 

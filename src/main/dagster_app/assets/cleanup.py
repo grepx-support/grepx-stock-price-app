@@ -1,89 +1,105 @@
+"""Cleanup assets for managing database collections and tables."""
+
 import logging
 from dagster import asset
+from omegaconf import OmegaConf
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
 @asset(
-    name="cleanup_all_collections",
-    description="Delete all collections from stocks, futures, and indices databases",
-    tags={"kind": "utility", "team": "data-engineering"}
+    name="cleanup_databases",
+    description="Cleanup selected databases based on database.yaml config",
+    tags={"kind": "utility"},
 )
-async def cleanup_all_collections():
-    from main import get_database
+def cleanup_databases():
+    """Cleanup databases based on configuration - synchronous version for Dagster compatibility.
 
-    target_databases = [
-        "stocks_analysis",
-        "futures_analysis",
-        "indices_analysis",
-    ]
-
-    summary = {}
-
-    for db_name in target_databases:
-        db = get_database(db_name)
-        collections = await db.list_collection_names()
-
-        logger.info(f"Database '{db_name}': {len(collections)} collections found")
-
-        deleted = 0
-        for name in collections:
-            try:
-                await db[name].drop()
-                deleted += 1
-                logger.info(f"[{db_name}] ✓ Dropped {name}")
-            except Exception as e:
-                logger.error(f"[{db_name}] ✗ Failed to drop {name}: {e}")
-
-        summary[db_name] = {
-            "collections_deleted": deleted,
-            "total_collections": len(collections),
-        }
-
-    logger.warning(f"CLEANUP SUMMARY: {summary}")
-    return summary
-
-async def cleanup_specific_collections(context) -> dict:
+    This asset cleans up databases specified in the database.yaml configuration.
+    It handles MongoDB (drops entire databases), PostgreSQL (drops databases),
+    and SQLite (deletes database files).
     """
-    Delete specific collections from the database.
+    from database_app.services.cleanup_services import (
+        cleanup_mongodb_databases,
+        cleanup_postgresql_databases,
+        cleanup_sqlite_files,
+    )
+    import asyncio
 
-    Config example:
-    ops:
-      cleanup_specific_collections:
-        config:
-          collection_names: ["stocks_sma_indicator", "stocks_ema_indicator"]
-    """
-    collection_names = context.op_config["collection_names"]
-    from main import get_database
+    # Load configuration
+    asset_file = Path(__file__)
+    resources_dir = asset_file.parent.parent.parent / "resources"
+    database_yaml = resources_dir / "database.yaml"
 
-    db_name = "stock_analysis"
-    db = get_database(db_name)
+    try:
+        config = OmegaConf.load(str(database_yaml))
+        database_config = config.get("database", {})
+    except Exception as e:
+        logger.error(f"[CLEANUP] Failed to load database.yaml: {e}")
+        return {"error": f"Failed to load config: {str(e)}"}
 
-    deleted_count = 0
-    failed = []
+    results = {}
 
-    logger.info(f"Starting cleanup of {len(collection_names)} specific collections")
+    # Detect backend type from configuration
+    connection_string = database_config.get("connection_string", "")
+    host = database_config.get("host")
+    port = database_config.get("port")
+    username = database_config.get("username")
+    password = database_config.get("password")
+    databases_to_cleanup = ["stocks_analysis", "indices_analysis", "futures_analysis"]
 
-    for collection_name in collection_names:
-        try:
-            await db[collection_name].drop()
-            logger.info(f"✓ Deleted collection: {collection_name}")
-            deleted_count += 1
-        except Exception as e:
-            logger.error(f"✗ Failed to delete collection {collection_name}: {str(e)}")
-            failed.append(collection_name)
+    try:
+        # Determine which backend is configured
+        if connection_string:
+            if "mongodb" in connection_string.lower():
+                logger.info("[CLEANUP] MongoDB backend detected")
+                result = asyncio.run(
+                    cleanup_mongodb_databases(
+                        connection_string=connection_string,
+                        databases_to_delete=databases_to_cleanup,
+                    )
+                )
+                results["mongodb"] = result
+            elif "postgresql" in connection_string.lower():
+                logger.info("[CLEANUP] PostgreSQL backend detected")
+                # Parse connection string or use parameters
+                result = asyncio.run(
+                    cleanup_postgresql_databases(
+                        host=host or "localhost",
+                        port=port or 5432,
+                        username=username or "postgres",
+                        password=password or "",
+                        databases_to_delete=databases_to_cleanup,
+                    )
+                )
+                results["postgresql"] = result
+            elif "sqlite" in connection_string.lower():
+                logger.info("[CLEANUP] SQLite backend detected")
+                result = asyncio.run(
+                    cleanup_sqlite_files(databases_to_delete=databases_to_cleanup)
+                )
+                results["sqlite"] = result
+        elif host and port and username:
+            # Parameters-based config (PostgreSQL)
+            logger.info("[CLEANUP] PostgreSQL backend detected (parameter-based)")
+            result = asyncio.run(
+                cleanup_postgresql_databases(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password or "",
+                    databases_to_delete=databases_to_cleanup,
+                )
+            )
+            results["postgresql"] = result
+        else:
+            logger.warning("[CLEANUP] No database backend configuration found")
+            return {"error": "No database configuration found in database.yaml"}
 
-    result = {
-        "database": db_name,
-        "collections_deleted": deleted_count,
-        "collections_requested": len(collection_names),
-        "failed": failed
-    }
+    except Exception as e:
+        logger.error(f"[CLEANUP] Error during cleanup: {e}", exc_info=True)
+        return {"error": str(e)}
 
-    logger.info(f"Cleanup complete: {deleted_count}/{len(collection_names)} collections deleted")
-
-    return result
-
-# __all__ = [
-#     "cleanup_all_collections",
-# ]
+    logger.warning(f"[CLEANUP] SUMMARY: {results}")
+    return results
