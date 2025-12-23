@@ -1,89 +1,84 @@
-import logging
 from dagster import asset
-
-logger = logging.getLogger(__name__)
-
+from omegaconf import OmegaConf
+from pathlib import Path
+from database_app.services.cleanup_services import cleanup_collections, cleanup_mongodb_databases
+from urllib.parse import urlparse
 
 @asset(
-    name="cleanup_all_collections",
-    description="Delete all collections from stocks, futures, and indices databases",
-    tags={"kind": "utility", "team": "data-engineering"}
+    name="cleanup_databases",
+    description="Cleanup selected databases based on database.yaml config",
+    tags={"kind": "utility"},
 )
-async def cleanup_all_collections():
-    from main import get_database
-
-    target_databases = [
-        "stocks_analysis",
-        "futures_analysis",
-        "indices_analysis",
-    ]
-
-    summary = {}
-
-    for db_name in target_databases:
-        db = get_database(db_name)
-        collections = await db.list_collection_names()
-
-        logger.info(f"Database '{db_name}': {len(collections)} collections found")
-
-        deleted = 0
-        for name in collections:
-            try:
-                await db[name].drop()
-                deleted += 1
-                logger.info(f"[{db_name}] ✓ Dropped {name}")
-            except Exception as e:
-                logger.error(f"[{db_name}] ✗ Failed to drop {name}: {e}")
-
-        summary[db_name] = {
-            "collections_deleted": deleted,
-            "total_collections": len(collections),
-        }
-
-    logger.warning(f"CLEANUP SUMMARY: {summary}")
-    return summary
-
-async def cleanup_specific_collections(context) -> dict:
+async def cleanup_databases():
+    
     """
-    Delete specific collections from the database.
+    Dagster asset to clean up databases or tables based on configuration.
 
-    Config example:
-    ops:
-      cleanup_specific_collections:
-        config:
-          collection_names: ["stocks_sma_indicator", "stocks_ema_indicator"]
+    Reads 'resources/database.yaml' for backend-specific cleanup instructions,
+    then asynchronously deletes the specified MongoDB databases, SQLite tables,
+    and PostgreSQL tables.
+
+    Returns:
+        dict: A dictionary with cleanup results per backend, including:
+              - 'requested': number of items intended for deletion
+              - 'deleted': number of items successfully deleted
+              - 'failed': number of items that failed to delete
+              - 'deleted_items': list of successfully deleted items
+              - 'failed_items': list of items that failed deletion
     """
-    collection_names = context.op_config["collection_names"]
-    from main import get_database
 
-    db_name = "stock_analysis"
-    db = get_database(db_name)
-
-    deleted_count = 0
-    failed = []
-
-    logger.info(f"Starting cleanup of {len(collection_names)} specific collections")
-
-    for collection_name in collection_names:
-        try:
-            await db[collection_name].drop()
-            logger.info(f"✓ Deleted collection: {collection_name}")
-            deleted_count += 1
-        except Exception as e:
-            logger.error(f"✗ Failed to delete collection {collection_name}: {str(e)}")
-            failed.append(collection_name)
-
-    result = {
-        "database": db_name,
-        "collections_deleted": deleted_count,
-        "collections_requested": len(collection_names),
-        "failed": failed
-    }
-
-    logger.info(f"Cleanup complete: {deleted_count}/{len(collection_names)} collections deleted")
-
-    return result
-
-# __all__ = [
-#     "cleanup_all_collections",
-# ]
+    asset_file = Path(__file__)
+    resources_dir = asset_file.parents[2] / "resources"
+    config_path = resources_dir / "database.yaml"
+    
+    if not config_path.exists():
+        raise FileNotFoundError(
+        f"Database configuration file not found at '{config_path}'. "
+        "Ensure that 'database.yaml' exists in the resources directory."
+    )
+    try:
+        config = OmegaConf.load(str(config_path))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to load or parse database configuration from '{config_path}': {exc}"
+        ) from exc
+        
+    backends_config = config.backends
+    
+    results = {}
+    
+    # Process MongoDB
+    if backends_config.mongodb.enabled:
+        mongo_config = backends_config.mongodb
+        results["mongodb"] = await cleanup_mongodb_databases(
+            connection_string=mongo_config.connection_string,
+            databases_to_delete=list(mongo_config.databases_to_delete),
+            backend_name="mongodb"
+        )
+    
+    # Process SQLite
+    if backends_config.sqlite.enabled:
+        sqlite_config = backends_config.sqlite
+        parsed = urlparse(sqlite_config.connection_string)
+        if parsed.scheme != "sqlite":
+            raise ValueError(f"Expected a sqlite connection string, got {sqlite_config.connection_string}")
+        db_path = parsed.path
+        results["sqlite"] = await cleanup_collections(
+            backend_name="sqlite",
+            connection_params={
+                "database": db_path
+            },
+            collection_names=list(sqlite_config.tables_to_delete) if sqlite_config.tables_to_delete else None,
+        )
+    
+    # Process PostgreSQL
+    if backends_config.postgresql.enabled:
+        postgresql_config = backends_config.postgresql
+        conn_str = postgresql_config.connection_string
+        results["postgresql"] = await cleanup_collections(
+            backend_name="postgresql",
+            connection_params={"connection_string": conn_str},
+            collection_names=list(postgresql_config.tables_to_delete) if postgresql_config.tables_to_delete else None,
+        )
+    
+    return results

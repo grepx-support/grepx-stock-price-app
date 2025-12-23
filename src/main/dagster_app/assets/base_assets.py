@@ -4,7 +4,7 @@ from typing import Dict, List
 from servers.factors.config import cfg
 from omegaconf import OmegaConf
 
-class StockAssetFactory:
+class AssetFactory:
     @staticmethod
     def create_prices_config_asset(asset_type: str, group_name: str):
         @asset(
