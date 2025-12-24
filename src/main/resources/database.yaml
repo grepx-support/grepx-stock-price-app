@@ -1,5 +1,5 @@
 database:
-  connection_string: "mongodb://admin:password123@localhost:27017/stock_analysis_test?authSource=admin"
+  connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
   pool_size: 10
   min_pool_size: 2
   max_pool_size: 50
@@ -10,7 +10,7 @@ database:
 backends:
   mongodb:
     enabled: true
-    connection_string: "mongodb://admin:password123@localhost:27017?authSource=admin"
+    connection_string: "mongodb+srv://grepx_mongo_user:Singapore%40123@grepx.f0vzhpn.mongodb.net/stock_analysis_demo?appName=grepx"
     databases_to_delete:
       - futures_analysis
       - stocks_analysis
