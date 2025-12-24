@@ -156,9 +156,9 @@ case "$1" in
         log "Starting all services..."
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         sleep 2
-        start_service "flower" "celery -A celery_main:app flower --port=5555"
+        start_service "flower" "celery -A celery_main:app flower --port=5555 --address=0.0.0.0"
         sleep 2
-        start_service "dagster" "dagster dev -m dagster_main"
+        start_service "dagster" "dagster dev -m dagster_main -h 0.0.0.0"
         sleep 2
         start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         sleep 2
