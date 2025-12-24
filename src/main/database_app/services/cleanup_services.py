@@ -132,18 +132,26 @@ async def cleanup_sqlite_files(
 ) -> dict:
     """Delete SQLite database files.
 
+    Uses the same data directory as database_helpers.py: database_app/data
+
     Args:
-        databases_to_delete: List of database file paths or names to delete
+        databases_to_delete: List of database file names (without .db extension) to delete
 
     Returns:
         Dict with deletion results
     """
     from pathlib import Path
-    import os
 
     deleted = []
     failed = []
-    data_dir = Path(os.getcwd()) / "data"
+
+    # Use the same path as database_helpers.py: database_app/data
+    # Navigate from this file: database_app/services/cleanup_services.py
+    current_file = Path(__file__)
+    database_app_dir = current_file.parent.parent  # Go up to database_app
+    data_dir = database_app_dir / "data"
+
+    logger.info(f"[CLEANUP] Looking for SQLite databases in: {data_dir.absolute()}")
 
     try:
         for db_name in databases_to_delete:
@@ -152,7 +160,9 @@ async def cleanup_sqlite_files(
                 if not db_name.endswith('.db'):
                     db_path = data_dir / f"{db_name}.db"
                 else:
-                    db_path = Path(db_name)
+                    db_path = data_dir / db_name
+
+                logger.debug(f"[CLEANUP] Attempting to delete: {db_path.absolute()}")
 
                 if db_path.exists():
                     db_path.unlink()
@@ -160,7 +170,8 @@ async def cleanup_sqlite_files(
                     logger.info(f"[CLEANUP] Deleted SQLite database file: {db_path}")
                 else:
                     logger.warning(f"[CLEANUP] SQLite database file not found: {db_path}")
-                    deleted.append(str(db_path))  # Count as deleted if not found
+                    # Still count it as a success since it's already gone
+                    deleted.append(str(db_path))
             except Exception as e:
                 failed.append(db_name)
                 logger.error(f"[CLEANUP] Failed to delete SQLite database {db_name}: {str(e)}")

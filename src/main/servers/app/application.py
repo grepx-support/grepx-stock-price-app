@@ -13,8 +13,6 @@ from pathlib import Path
 from servers.config import ConfigLoader
 from grepx_connection_registry import ConnectionManager, ConnectionFactory
 from servers.utils.logger import AppLogger
-# Prefect app import
-from prefect_app.prefect_app import load_prefect_flows
 
 
 logger = logging.getLogger(__name__)
@@ -57,12 +55,6 @@ class Application:
         connection_registry_path = self.root.parent / "libs" / "grepx-connection-registry" / "src"
         if str(connection_registry_path) not in sys.path:
             sys.path.insert(0, str(connection_registry_path))
-        
-        # Add Prefect framework to path
-        prefect_framework_path = self.root.parent / "libs" / "prefect_framework" / "src"
-        if str(prefect_framework_path) not in sys.path:
-            sys.path.insert(0, str(prefect_framework_path))
-        
 
         # Load configuration
         try:

@@ -1,4 +1,4 @@
-"""Database connection - simple ORM wrapper.
+"""Database connection - simple ORM wrapper with extracted helper methods.
 
 Single responsibility: Wrap ORM Session and provide database/collection access.
 All connection management is handled by ConnectionBase.
@@ -6,7 +6,10 @@ All connection management is handled by ConnectionBase.
 
 import asyncio
 import threading
+import logging
 from grepx_connection_registry import ConnectionBase
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnection(ConnectionBase):
@@ -22,116 +25,98 @@ class DatabaseConnection(ConnectionBase):
         self._lock = threading.Lock()
         self._session = None
         self._loop = None
-        self._connection_params = {}  # Store connection parameters for accessing later
+        self._connection_params = {}
+
+    def _create_session_from_string(self, active_backend: str, connection_string: str, database_name: str):
+        """Create session using connection string format."""
+        from core import Session
+        return Session.from_backend_name(active_backend, connection_string=connection_string, database=database_name)
+
+    def _create_session_from_params(self, active_backend: str, host: str, port: int, username: str, password: str, database_name: str):
+        """Create session using parameter-based format."""
+        from core import Session
+        self._connection_params = {'host': host, 'port': port, 'username': username, 'password': password, 'database': database_name}
+        return Session.from_backend_name(active_backend, host=host, port=port, username=username, password=password, database=database_name)
+
+    def _setup_event_loop(self):
+        """Setup event loop with proper error handling for async contexts."""
+        try:
+            asyncio.get_running_loop()
+            raise RuntimeError(
+                "Cannot initialize DatabaseConnection synchronously within an async context. "
+                "The database connection is being created inside an async function/Dagster asset. "
+                "Please refactor to make the asset/function non-async or pre-initialize the connection."
+            )
+        except RuntimeError as e:
+            if "Cannot initialize DatabaseConnection" in str(e):
+                raise
+            try:
+                self._loop = asyncio.get_event_loop()
+                if self._loop.is_closed():
+                    self._loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(self._loop)
+            except RuntimeError:
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+
+    def _assign_backend_client(self):
+        """Extract and assign backend client from session."""
+        backend = self._session.backend
+        if hasattr(backend, 'client'):
+            self._client = backend.client
+        elif hasattr(backend, 'connection'):
+            self._client = backend.connection
+        else:
+            self._client = backend
+
+    def _get_backend_data(self, obj, key):
+        """Shared utility for accessing backend data with fallback."""
+        if hasattr(obj, '__getitem__'):
+            return obj[key]
+        return self._session.backend
 
     def connect(self) -> None:
         """Connect using ORM Session with a single event loop."""
         if self._client is not None:
-            return  # Already connected
+            return
 
         with self._lock:
             if self._client is not None:
-                return  # Double-check after lock
+                return
 
             from core import Session
 
-            # Get active backend from config
             active_backend = self.config.database.get('active_backend', 'postgresql')
             backend_config = self.config.database.get(active_backend, {})
 
             if not backend_config:
                 raise ValueError(f"Backend '{active_backend}' not configured in database.yaml")
 
-            # Support both connection_string and individual parameters
             connection_string = backend_config.get('connection_string', None)
+            database_name = backend_config.get('database', 'admin' if connection_string else 'postgres')
 
             if connection_string:
-                # Using connection_string format
-                database_name = backend_config.get('database', 'admin')
-
-                # Create session with connection string
-                self._session = Session.from_backend_name(
-                    active_backend,
-                    connection_string=connection_string,
-                    database=database_name
-                )
+                self._session = self._create_session_from_string(active_backend, connection_string, database_name)
             else:
-                # Using individual parameters format (for PostgreSQL)
                 host = backend_config.get('host', 'localhost')
                 port = backend_config.get('port', 5432)
                 username = backend_config.get('username', 'postgres')
                 password = backend_config.get('password', '')
-                database_name = backend_config.get('database', 'postgres')
+                self._session = self._create_session_from_params(active_backend, host, port, username, password, database_name)
 
-                # Store connection parameters for later use (e.g., in PostgreSQL helper functions)
-                self._connection_params = {
-                    'host': host,
-                    'port': port,
-                    'username': username,
-                    'password': password,
-                    'database': database_name
-                }
-
-                # Create session with parameters
-                self._session = Session.from_backend_name(
-                    active_backend,
-                    host=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    database=database_name
-                )
-
-            # Create event loop ONCE and reuse it
-            # First, check if there's already a running loop
-            try:
-                current_loop = asyncio.get_running_loop()
-                # If we got here, there IS a running loop (Dagster, async context, etc.)
-                # We're already in an async context, so we cannot call sync code that tries to
-                # run async operations. We need to raise an error and let the caller handle it.
-                # The connection should be lazy-loaded or the caller should handle async properly.
-                raise RuntimeError(
-                    "Cannot initialize DatabaseConnection synchronously within an async context. "
-                    "The database connection is being created inside an async function/Dagster asset. "
-                    "Please refactor to make the asset/function non-async or pre-initialize the connection."
-                )
-            except RuntimeError as e:
-                if "Cannot initialize DatabaseConnection" in str(e):
-                    raise
-                # No running loop, safe to create and manage our own
-                try:
-                    self._loop = asyncio.get_event_loop()
-                    if self._loop.is_closed():
-                        self._loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(self._loop)
-                except RuntimeError:
-                    # No event loop in current thread
-                    self._loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self._loop)
-
-                # Now we have a safe loop to use
-                self._loop.run_until_complete(self._session.__aenter__())
-            # Store backend client/connection (different backends use different names)
-            if hasattr(self._session.backend, 'client'):
-                self._client = self._session.backend.client
-            elif hasattr(self._session.backend, 'connection'):
-                self._client = self._session.backend.connection
-            else:
-                self._client = self._session.backend
+            self._setup_event_loop()
+            self._loop.run_until_complete(self._session.__aenter__())
+            self._assign_backend_client()
 
     def disconnect(self) -> None:
         """Close connection cleanly."""
         if self._session:
             try:
-                # Check if we have a loop to use
                 if self._loop:
                     self._loop.run_until_complete(self._session.__aexit__(None, None, None))
                 else:
-                    # No loop stored (was using asyncio.run), use it again
                     asyncio.run(self._session.__aexit__(None, None, None))
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Error disconnecting database: {e}")
             finally:
                 self._session = None
@@ -149,11 +134,7 @@ class DatabaseConnection(ConnectionBase):
             Database client object (varies by backend)
         """
         client = self.get_client()
-        # For MongoDB, use subscript notation
-        # For SQLite/PostgreSQL, this may not apply, so return client
-        if hasattr(client, '__getitem__'):
-            return client[db_name]
-        return client
+        return self._get_backend_data(client, db_name)
 
     def get_collection(self, db_name: str, collection_name: str):
         """Get collection from database.
@@ -166,9 +147,4 @@ class DatabaseConnection(ConnectionBase):
             Collection client object
         """
         db = self.get_database(db_name)
-        # For MongoDB, use subscript notation on database
-        # For SQLite/PostgreSQL, return the collection/table directly via session
-        if hasattr(db, '__getitem__'):
-            return db[collection_name]
-        # For other backends, return the session's backend
-        return self._session.backend
+        return self._get_backend_data(db, collection_name)

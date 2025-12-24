@@ -25,7 +25,7 @@ asset_types:
     store_timeout: 180
 
 start_date: "2021-12-01"
-end_date: "2025-12-01"
+end_date: "2025-12-24"
 
 indicators:
   SMA:
