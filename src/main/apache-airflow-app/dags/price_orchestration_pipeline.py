@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from tasks import stocks, indices, futures
 
 default_args = {
+    "owner": "airflow",
     "retries": 2,
-    "retry_delay": timedelta(minutes=5)
+    "retry_delay": timedelta(minutes=5),
 }
 
 with DAG(

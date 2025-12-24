@@ -1,15 +1,20 @@
-# Byte-compiled / optimized / DLL files
+# ===============================
+# Python bytecode / cache
+# ===============================
 __pycache__/
 *.py[cod]
 *$py.class
 
+# ===============================
 # C extensions
+# ===============================
 *.so
 
+# ===============================
 # Distribution / packaging
+# ===============================
 .Python
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
@@ -27,27 +32,29 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Unit test / coverage reports
+# ===============================
+# Test / coverage reports
+# ===============================
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
+.coverage*
+.cache/
 nosetests.xml
 coverage.xml
 *.cover
-*.py,cover
 .hypothesis/
 .pytest_cache/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# ===============================
+# Jupyter
+# ===============================
+.ipynb_checkpoints/
 
-# pyenv
+# ===============================
+# Python version / environments
+# ===============================
 .python-version
-
-# Environments
 .env
 .venv
 env/
@@ -56,37 +63,46 @@ ENV/
 env.bak/
 venv.bak/
 
-# IDEs
+# ===============================
+# IDE / Editor files
+# ===============================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Project-specific
+# ===============================
+# Project-specific (Airflow / Dagster)
+# ===============================
 logs/
 *.log
 dagster_home/
 .dagster/
 *.db
-*.sqlite
-*.sqlite3
+*.sqlite*
 flower.db
 celerybeat-schedule.db
 
+# ===============================
 # Temporary files
+# ===============================
 nul
 tmp/
 temp/
 *.tmp
 
-# OS files
+# ===============================
+# OS-generated files
+# ===============================
 Thumbs.db
 .DS_Store
 .AppleDouble
 .LSOverride
 
+# ===============================
 # Large media files
+# ===============================
 *.mp4
 *.tiff
 *.avi
@@ -94,15 +110,21 @@ Thumbs.db
 *.mov
 *.wmv
 
-# Package files
+# ===============================
+# Package / binary files
+# ===============================
 *.jar
 *.war
 *.exe
 *.app
 
-# Maven / Java
+# ===============================
+# Java / Maven
+# ===============================
 target/
 *.class
 
-# Node
+# ===============================
+# Node.js
+# ===============================
 node_modules/
