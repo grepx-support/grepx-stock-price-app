@@ -39,20 +39,31 @@ class TaskFactory:
         """Create a store price task"""
         def store_task(self, price_data, symbol):
             try:
-                from main import get_collection
+                from main import get_app
                 from database_app.services.naming import naming
 
                 db_name = naming.get_analysis_db_name(asset_type)
-                collection_name = naming.get_price_collection_name(asset_type, symbol)
-                collection = get_collection(db_name, collection_name)
+                if not db_name or db_name.strip() == "":
+                    raise ValueError(f"Database name is empty for asset_type: {asset_type}")
 
+                collection_name = naming.get_price_collection_name(asset_type, symbol)
+                if not collection_name or collection_name.strip() == "":
+                    raise ValueError(f"Collection name is empty for symbol: {symbol}")
+
+                logger.debug(f"[{asset_type.upper()}] Getting session for: {db_name}.{collection_name}")
+
+                # Get the application and its ORM session
+                app = get_app()
+                conn = app.get_connection('primary_db')
+                session = conn._session
 
                 logger.info(f"[{asset_type.upper()}] Storing {symbol} to {db_name}.{collection_name}")
-                result = service_func(price_data, collection)
+                # Pass session, db_name, and collection_name for proper database routing
+                result = service_func(price_data, session, db_name, collection_name)
                 logger.info(f"[{asset_type.upper()}] Stored {symbol}: {result.get('stored', 0)} records")
                 return result
             except Exception as exc:
-                logger.error(f"[{asset_type.upper()}] Store error for {symbol}: {exc}")
+                logger.error(f"[{asset_type.upper()}] Store error for {symbol}: {exc}", exc_info=True)
                 raise self.retry(exc=exc, countdown=2 ** self.request.retries)
 
         return store_task
@@ -76,20 +87,33 @@ class TaskFactory:
     def create_store_indicator_task(service_func, asset_type: str):
         def store_task(self, symbol, factor, factor_data):
             try:
-                from main import get_collection
+                from main import get_app
                 from database_app.services.naming import naming
+                from core import Session
 
                 db_name = naming.get_analysis_db_name(asset_type)
+                if not db_name or db_name.strip() == "":
+                    raise ValueError(f"Database name is empty for asset_type: {asset_type}")
+
                 collection_name = naming.get_indicator_collection_name(asset_type, symbol, factor)
-                collection = get_collection(db_name, collection_name)
+                if not collection_name or collection_name.strip() == "":
+                    raise ValueError(f"Collection name is empty for {symbol}/{factor}")
+
+                logger.debug(f"[{asset_type.upper()}] Getting session for: {db_name}.{collection_name}")
+
+                # Get the application and its ORM session
+                app = get_app()
+                conn = app.get_connection('primary_db')
+                session = conn._session
 
                 logger.info(f"[{asset_type.upper()}] Storing {factor} for {symbol} → {db_name}.{collection_name}")
 
-                result = service_func(factor_data, collection)
+                # Pass session, db_name, and collection_name for proper database routing
+                result = service_func(factor_data, session, db_name, collection_name)
                 logger.info(f"[{asset_type.upper()}] Stored {factor} for {symbol}: {result.get('stored', 0)}")
                 return result
             except Exception as e:
-                logger.error(f"[{asset_type.upper()}] Indicator store error for {symbol}_{factor}: {e}")
+                logger.error(f"[{asset_type.upper()}] Indicator store error for {symbol}_{factor}: {e}", exc_info=True)
                 raise self.retry(exc=e, countdown=5)
 
         return store_task
