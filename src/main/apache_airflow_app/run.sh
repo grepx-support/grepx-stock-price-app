@@ -1,95 +1,112 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
-echo "========================================="
-echo "     Apache Airflow Standalone Setup"
-echo "========================================="
+# ============================================================================
+# Apache Airflow Setup & Run Script (Clean + Reproducible)
+# ============================================================================
 
-### -----------------------------
-### 1. SET AIRFLOW_HOME TO THIS FOLDER
-### -----------------------------
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-export AIRFLOW_HOME="${SCRIPT_DIR}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AIRFLOW_HOME="$SCRIPT_DIR"
+VENV_DIR="$PROJECT_ROOT/apache_airflow_app/venv_airflow"
 
-echo "✔ AIRFLOW_HOME = $AIRFLOW_HOME"
-cd "$AIRFLOW_HOME"
-
-### -----------------------------
-### 2. USE PYTHON 3.11 (Best wheel support)
-### -----------------------------
-if ! command -v python3.11 &> /dev/null; then
-  echo "❌ Python 3.11 is required but not found"
-  echo "Install it with: brew install python@3.11"
-  exit 1
-fi
-
+AIRFLOW_VERSION="2.10.3"
 PYTHON_CMD="python3.11"
-PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 
-echo "✔ Using Python ${PYTHON_VERSION}"
+echo "=========================================="
+echo "Apache Airflow Setup & Run"
+echo "=========================================="
+echo "Project Root : $PROJECT_ROOT"
+echo "Airflow Home : $AIRFLOW_HOME"
+echo "Airflow Ver  : $AIRFLOW_VERSION"
+echo ""
 
-### -----------------------------
-### 3. INSTALL uv IF NOT PRESENT
-### -----------------------------
-if ! command -v uv &> /dev/null; then
-  echo "⚠ uv not found — installing..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
-else
-  echo "✔ uv already installed"
+# ============================================================================
+# 1. CHECK PYTHON VERSION
+# ============================================================================
+echo "▶ Step 1: Checking Python..."
+
+if ! command -v $PYTHON_CMD &> /dev/null; then
+    echo "❌ Python 3.11 not found"
+    echo "Install with: brew install python@3.11"
+    exit 1
 fi
 
-### -----------------------------
-### 4. CREATE & ACTIVATE VENV
-### -----------------------------
-if [ ! -d "${SCRIPT_DIR}/venv" ]; then
-  echo "✔ Creating .venv using uv…"
-  uv venv --python=$PYTHON_CMD "${SCRIPT_DIR}/venv"
+echo "✓ Using $($PYTHON_CMD --version)"
+
+# ============================================================================
+# 2. CREATE FRESH VENV
+# ============================================================================
+echo ""
+echo "▶ Step 2: Creating virtual environment..."
+
+rm -rf "$VENV_DIR"
+$PYTHON_CMD -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
+
+echo "✓ Virtual environment ready"
+
+# ============================================================================
+# 3. UPGRADE PIP TOOLING
+# ============================================================================
+echo ""
+echo "▶ Step 3: Upgrading pip..."
+
+pip install --upgrade pip setuptools wheel
+echo "✓ pip upgraded"
+
+# ============================================================================
+# 4. INSTALL LOCAL LIBS FIRST
+# ============================================================================
+LOCAL_LIBS_DIR="$PROJECT_ROOT/../../.."  # go up 3 levels to reach grepx-orchestrator
+LOCAL_LIBS_DIR="$LOCAL_LIBS_DIR/libs"    # then into libs
+
+if [ -d "$LOCAL_LIBS_DIR" ]; then
+    echo "▶ Installing all local libraries from $LOCAL_LIBS_DIR..."
+    for lib in "$LOCAL_LIBS_DIR/"*; do
+        [ -d "$lib" ] && pip install -e "$lib"
+    done
+    echo "✓ Local libraries installed"
 else
-  echo "✔ Using existing venv"
-  rm -rf "${SCRIPT_DIR}/venv/lib/python*/site-packages/grpc*"
+    echo "⚠️ $LOCAL_LIBS_DIR directory not found, skipping local libraries installation"
 fi
 
-source "${SCRIPT_DIR}/venv/bin/activate"
-which python
-echo "✔ Virtual environment activated"
 
-### -----------------------------
-### 5. REMOVE GRPCIO CACHE
-### -----------------------------
-echo "Cleaning up any cached grpcio builds..."
-rm -rf ~/.cache/uv/builds-v0
-rm -rf ~/.cache/uv/sdists-v9
+# ============================================================================
+# 4. INSTALL AIRFLOW (USING OFFICIAL CONSTRAINTS)
+# ============================================================================
+echo ""
+echo "▶ Step 4: Installing Apache Airflow (constrained)..."
 
-### -----------------------------
-### 6. UPGRADE PIP
-### -----------------------------
-echo "Upgrading pip..."
-$PYTHON_CMD -m pip install --upgrade pip
+pip install \
+  "apache-airflow==${AIRFLOW_VERSION}" \
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
 
-### -----------------------------
-### 7. USE AIRFLOW 2.10.3 WITH LEGACY EXECUTION MODE
-### ---------------------
-AIRFLOW_VERSION=2.10.3
-CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+echo "✓ Apache Airflow installed"
 
-echo "Installing Apache Airflow ${AIRFLOW_VERSION}..."
-echo "Using constraints: ${CONSTRAINT_URL}"
+# ============================================================================
+# 5. INSTALL PROJECT REQUIREMENTS (ON TOP)
+# ============================================================================
+echo ""
+echo "▶ Step 5: Installing project requirements..."
 
-# Install without any compiled dependencies
-$PYTHON_CMD -m pip install --no-cache-dir \
-  --constraint "${CONSTRAINT_URL}" \
-  "apache-airflow[webserver,crypto]==${AIRFLOW_VERSION}"
+pip install -r "$PROJECT_ROOT/apache_airflow_app/requirements.txt"
 
-echo "✔ Airflow installation complete"
+echo "✓ Project dependencies installed"
 
-### -----------------------------
-### 8. CONFIGURE AIRFLOW FOR LOCAL EXECUTION
-### -----------------------------
-echo "Configuring Airflow for stable local execution..."
 
-# Create airflow.cfg with settings that prevent timeout issues
-cat > "${SCRIPT_DIR}/airflow.cfg" <<'EOF'
+# ============================================================================
+# 6. AIRFLOW CONFIG
+# ============================================================================
+echo ""
+echo "▶ Step 6: Setting up airflow.cfg..."
+
+mkdir -p "$AIRFLOW_HOME/dags" "$AIRFLOW_HOME/logs"
+
+AIRFLOW_CFG="$AIRFLOW_HOME/airflow.cfg"
+
+if [ ! -f "$AIRFLOW_CFG" ]; then
+cat > "$AIRFLOW_CFG" << 'EOF'
 [core]
 dags_folder = /Users/mahesh/Desktop/Projects/grepx-orchestrator/price_app/src/main/apache_airflow_app/dags
 base_log_folder = /Users/mahesh/Desktop/Projects/grepx-orchestrator/price_app/src/main/apache_airflow_app/logs
@@ -112,37 +129,57 @@ auth_backends = airflow.api.auth.backend.default
 [logging]
 remote_logging = False
 
+
 EOF
+    echo "✓ airflow.cfg created"
+else
+    echo "✓ airflow.cfg already exists"
+fi
 
-echo "✔ Airflow configuration created"
+export AIRFLOW_HOME="$AIRFLOW_HOME"
 
-### -----------------------------
-### 9. INSTALL EXTRA PYTHON PACKAGES
-### -----------------------------
-echo "========================================="
-echo "Installing additional Python packages..."
-echo "========================================="
+# ============================================================================
+# 7. INITIALIZE DB
+# ============================================================================
+echo ""
+echo "▶ Step 7: Initializing Airflow DB..."
 
-$PYTHON_CMD -m pip install --no-cache-dir pandas==2.2.3
+if [ ! -f "$AIRFLOW_HOME/airflow.db" ]; then
+    airflow db migrate
+    echo "✓ Database initialized"
+else
+    echo "✓ Database already exists"
+fi
 
-echo "✔ pandas installed"
-python -c "import pandas; print(pandas.__version__)"
+# ============================================================================
+# 8. CREATE ADMIN USER
+# ============================================================================
+echo ""
+echo "▶ Step 8: Creating admin user (if missing)..."
 
-### -----------------------------
-### 10. INITIALIZE DATABASE
-### -----------------------------
-echo "Initializing Airflow database..."
-"${SCRIPT_DIR}/venv/bin/airflow" db migrate
+if ! airflow users list | grep -q "^admin"; then
+    airflow users create \
+        --username admin \
+        --firstname Airflow \
+        --lastname Admin \
+        --role Admin \
+        --email admin@example.com \
+        --password admin123
+    echo "✓ Admin user created"
+else
+    echo "✓ Admin user already exists"
+fi
 
-echo "✔ Database initialized"
+# ============================================================================
+# 9. START AIRFLOW
+# ============================================================================
+echo ""
+echo "=========================================="
+echo "✓ Setup complete — starting Airflow"
+echo "=========================================="
+echo "Web UI  : http://localhost:8080"
+echo "Login   : admin / admin123"
+echo ""
 
-### -----------------------------
-### 11. START AIRFLOW STANDALONE
-### -----------------------------
-echo "========================================="
-echo "Starting Airflow Standalone..."
-echo "========================================="
-echo "⚠️  If you see timeout errors, this is normal and will stabilize"
-echo "========================================="
-
-"${SCRIPT_DIR}/venv/bin/airflow" standalone
+cd "$PROJECT_ROOT"
+exec "$VENV_DIR/bin/airflow" standalone

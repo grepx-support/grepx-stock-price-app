@@ -1,4 +1,3 @@
-
 # airflow_app/factories/dag_builder.py
 
 from airflow import DAG
@@ -74,8 +73,9 @@ class DAGBuilder:
         )
         
         # Set dependencies
+        health_check = DAGFactory.create_health_check_task(asset_type, dag)
         config_prices_task >> fetch_task_obj >> store_task_obj
-        config_indicators_task >> [indicator_tasks[ind] for ind in cfg.indicators.keys()]
+        config_indicators_task >> fetch_task_obj >> [indicator_tasks[ind] for ind in cfg.indicators.keys()]
         [indicator_tasks[ind] for ind in cfg.indicators.keys()] >> store_indicators_task_obj
         
         return dag

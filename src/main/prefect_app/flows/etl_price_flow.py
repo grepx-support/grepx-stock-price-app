@@ -1,5 +1,5 @@
 from prefect import flow
-from price_app.src.main.prefect_app.tasks.price_tasks import fetch_raw_prices, compute_indicators, store_results
+from prefect_app.tasks.price_tasks import fetch_raw_prices, compute_indicators, store_results
 
 
 @flow(name="Price ETL Flow", log_prints=True)

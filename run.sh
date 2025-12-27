@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -e
 
 cd "$(dirname "$0")"
 source common.sh
@@ -38,8 +38,13 @@ start_service() {
     # Ensure PYTHONPATH is set in the command for background processes
     eval "PYTHONPATH=\"$PYTHONPATH\" $cmd >> $log_file 2>&1 &"
     local pid=$!
+    sleep 1
+    if ! is_running "$pid"; then
+        log_error "$name failed to start. Check $log_file"
+        return 1
+    fi
+echo "${name}:${pid}" >> "$PID_FILE"
 
-    echo "${name}:${pid}" >> "$PID_FILE"
     log "$name started (PID: $pid)"
 }
 
@@ -65,7 +70,7 @@ stop_service() {
 check_status() {
     log "Checking service status..."
     echo ""
-    
+
     local services=("celery" "flower" "dagster" "prefect-worker")
     local all_running=true
 
@@ -137,13 +142,11 @@ stop_by_ports() {
 
     log "Killing processes on port 5555 (Flower)..."
     kill_port 5555
-
     # Also try to kill by process name as fallback
     log "Killing processes by name..."
     pkill -f "celery.*worker" 2>/dev/null || true
     pkill -f "flower" 2>/dev/null || true
     pkill -f "dagster" 2>/dev/null || true
-
     # Clean up PID file if it exists
     [ -f "$PID_FILE" ] && rm -f "$PID_FILE" || true
 
@@ -153,17 +156,23 @@ stop_by_ports() {
 # Main commands
 case "$1" in
     start)
-        log "Starting all services..."
+        log "Starting all services..."        # Start core services
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         sleep 2
         start_service "flower" "celery -A celery_main:app flower --port=5555 --address=0.0.0.0"
         sleep 2
         start_service "dagster" "dagster dev -m dagster_main -h 0.0.0.0"
         sleep 2
-        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
-        sleep 2
-        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
-        sleep 2
+        # Start Prefect worker
+        # Start Prefect server first
+        start_service "prefect-server" "prefect server start --port 4200"
+        sleep 5
+
+        # Ensure pool exists
+        prefect work-pool create price-pool --type process || true
+
+        # Then start worker
+        start_service "prefect-worker" "PREFECT_API_URL=\"http://localhost:4200/api\" prefect worker start --pool price-pool"
         echo ""
         check_status
         ;;
@@ -225,38 +234,39 @@ case "$1" in
         cd src/main
         dagster dev -m dagster_main
         ;;
-    
+
     flask)
         cd src/main
         flask --app flask_main:app run
         ;;
-    
+
     prefect)
         start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         ;;
-    
+
     prefect_deploy)
         prefect_deploy
         ;;
-    
+
     prefect_worker)
         prefect_worker
         ;;
-    
+
+
     *)
         echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect|prefect_deploy|prefect_worker}"
         echo ""
         echo "Commands:"
-        echo "  start         - Start all services (Celery, Flower, Dagster)"
-        echo "  stop          - Stop all services (tries PID first, falls back to ports)"
-        echo "  restart       - Restart all services"
-        echo "  status        - Check service status"
-        echo "  logs          - View logs: ./run.sh logs {celery|flower|dagster|prefect} [tail]"
-        echo "  kill-ports    - Force stop all services by killing processes on ports 3000, 5555"
-        echo "  celery        - Start celery and flower only"
-        echo "  dagster       - Start dagster in foreground"
-        echo "  flask         - Start flask in foreground"
-        echo "  prefect       - Start Prefect worker only"
+        echo "  start          - Start all services (Celery, Flower, Dagster, Prefect)"
+        echo "  stop           - Stop all services (tries PID first, falls back to ports)"
+        echo "  restart        - Restart all services"
+        echo "  status         - Check service status"
+        echo "  logs           - View logs: ./run.sh logs {celery|flower|dagster|prefect} [tail]"
+        echo "  kill-ports     - Force stop all services by killing processes on ports 3000, 5555, 8080"
+        echo "  celery         - Start celery and flower only"
+        echo "  dagster        - Start dagster in foreground"
+        echo "  flask          - Start flask in foreground"
+        echo "  prefect        - Start Prefect worker only"
         echo "  prefect_deploy - Deploy Prefect flows"
         echo "  prefect_worker - Start Prefect worker for price-pool"
         exit 1
