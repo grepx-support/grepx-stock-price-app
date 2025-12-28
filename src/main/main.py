@@ -9,16 +9,18 @@ For PyCharm debugging, use separate run configurations:
 """
 
 try:
-    # Import apps FIRST to register connection types
+    # Setup paths FIRST before importing apps
+    import sys
+    from pathlib import Path
+    prefect_framework_path = Path(__file__).parent / "libs" / "prefect_framework" / "src"
+    if prefect_framework_path.exists():
+        sys.path.insert(0, str(prefect_framework_path))
+
+    # Import apps to register connection types
     import database_app
     import celery_app
     import dagster_app
-    import prefect_app
-    # Import the Prefect framework
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent / "libs" / "prefect_framework" / "src"))
-    import prefect_framework
+    import prefect_app  # Will gracefully handle missing prefect_framework
 
     from servers.config import ConfigLoader
     from grepx_connection_registry import ConnectionManager
@@ -31,12 +33,13 @@ try:
     
     logger.info("Main module initialized")
     logger.debug("Application singleton created successfully")
-    logger.debug("Connection types registered: database, celery, dagster, prefect")
+    logger.debug("Connection types registered: database, celery, dagster, prefect (if available)")
     
     # Convenient exports
     get_connection = app.get_connection
     get_database = app.get_database
     get_collection = app.get_collection
+    get_app = lambda: app  # Return the application singleton
     config = app.config
     connections = app.connections
 
