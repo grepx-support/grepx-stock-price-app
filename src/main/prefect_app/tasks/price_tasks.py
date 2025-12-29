@@ -3,16 +3,6 @@ from typing import List, Dict
 from prefect import task
 from datetime import datetime
 
-# Real symbols mapping by asset type
-VALID_SYMBOLS = {
-    "stocks": [
-        "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS",
-        "INFY.NS", "HINDUNILVR.NS", "ICICIBANK.NS"
-    ],
-    "futures": ["NIFTY24DECFUT", "BANKNIFTY24DECFUT"],
-    "indices": ["^NSEI", "^BSESN"]  # Nifty50, Sensex
-}
-
 @task(name="fetch_raw_prices")
 def fetch_raw_prices(asset_type: str = "stocks", limit: int = 100) -> List[Dict]:
     """
@@ -22,10 +12,19 @@ def fetch_raw_prices(asset_type: str = "stocks", limit: int = 100) -> List[Dict]
     # Import and use the existing service function from database_app
     from database_app.services.stock_services import fetch_stock_price_data
     from servers.utils.logger import get_logger
+    import os
+    from pathlib import Path
+    from omegaconf import OmegaConf
     
     logger = get_logger(__name__)
     
-    symbols = VALID_SYMBOLS.get(asset_type, ["RELIANCE.NS"])
+    # Load symbols from configuration
+    config_dir = Path(__file__).parent.parent.parent / "resources"
+    config_path = config_dir / "asset.yaml"
+    config = OmegaConf.load(config_path)
+    
+    # Get symbols for the specified asset type
+    symbols = config.asset_types.get(asset_type, {}).get("symbols", ["AAPL"])
     logger.info(f"Fetching {len(symbols)} symbols for {asset_type}: {symbols}")
     
     all_records = []
