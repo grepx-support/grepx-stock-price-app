@@ -7,5 +7,5 @@ def load_prefect_flows():
     config = OmegaConf.load(config_path)
     
     # Import and return flows
-    from .flows.etl_price_flow import price_etl_flow
-    return {"price_etl_flow": price_etl_flow}
+    from .flows.etl_price_flow import generic_asset_etl
+    return {"generic_asset_etl": generic_asset_etl}
