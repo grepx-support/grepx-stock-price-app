@@ -1,169 +1,212 @@
 import os
-from typing import List, Dict
+from typing import Dict, List
 from prefect import task
+from pathlib import Path
+from omegaconf import OmegaConf
+import datetime
 from datetime import datetime
 
-@task(name="fetch_raw_prices")
-def fetch_raw_prices(asset_type: str = "stocks", limit: int = 100) -> List[Dict]:
+
+@task(name="config_prices")
+def config_prices(asset_type: str = "stocks") -> Dict:
     """
-    Fetch raw prices using database_app services.
-    Returns a list of dicts shaped like price data: symbol, price, volume, timestamp, metadata.
+    Get price fetching configuration from asset.yaml
     """
-    # Import and use the existing service function from database_app
-    from database_app.services.stock_services import fetch_stock_price_data
-    from servers.utils.logger import get_logger
-    import os
-    from pathlib import Path
-    from omegaconf import OmegaConf
-    
-    logger = get_logger(__name__)
-    
-    # Load symbols from configuration
+    # Load configuration from asset.yaml
     config_dir = Path(__file__).parent.parent.parent / "resources"
     config_path = config_dir / "asset.yaml"
     config = OmegaConf.load(config_path)
     
-    # Get symbols for the specified asset type
-    symbols = config.asset_types.get(asset_type, {}).get("symbols", ["AAPL"])
-    logger.info(f"Fetching {len(symbols)} symbols for {asset_type}: {symbols}")
+    # Extract the configuration for the specified asset type
+    asset_config = config.asset_types.get(asset_type, {})
+    symbols = asset_config.get("symbols", [])
+    
+    # Get date range from config
+    start_date = config.get("start_date", "2021-01-01")
+    end_date = config.get("end_date", "2025-12-01")
+    
+    return {
+        "symbols": symbols,
+        "start_date": start_date,
+        "end_date": end_date,
+        "fetch_timeout": asset_config.get("fetch_timeout", 120),
+        "asset_type": asset_type
+    }
+
+
+@task(name="config_indicators")
+def config_indicators(asset_type: str = "stocks") -> Dict:
+    """
+    Get indicator computation configuration from asset.yaml
+    """
+    # Load configuration from asset.yaml
+    config_dir = Path(__file__).parent.parent.parent / "resources"
+    config_path = config_dir / "asset.yaml"
+    config = OmegaConf.load(config_path)
+    
+    # Return the indicators configuration
+    indicators_config = OmegaConf.to_container(config.indicators, resolve=True)
+    
+    return {
+        "indicators": indicators_config,
+        "asset_type": asset_type
+    }
+
+
+@task(name="fetch_data")
+def fetch_data(config_data: Dict) -> List[Dict]:
+    """
+    Fetch data using database_app services
+    """
+    from database_app.services.stock_services import fetch_stock_price_data
+    from servers.utils.logger import get_logger
+    
+    logger = get_logger(__name__)
+    
+    symbols = config_data["symbols"]
+    start_date = config_data["start_date"]
+    end_date = config_data["end_date"]
     
     all_records = []
     for symbol in symbols:
         result = fetch_stock_price_data(symbol)
         if result["status"] == "success" and result["records"]:
             all_records.extend(result["records"])
-        # If no records from service, generate sample data to continue flow
-        elif not result.get("records") or len(result.get("records", [])) == 0:
-            logger.warning(f"No data from service for {symbol}, generating sample data")
-            # Generate sample data to ensure flow continues
-            for i in range(min(20, limit)):  # Generate up to 20 sample records per symbol
-                sample_record = {
-                    "symbol": symbol,
-                    "date": f"2024-12-{i+1:02d}",
-                    "open": 2000.0 + (i * 10),
-                    "high": 2010.0 + (i * 10),
-                    "low": 1990.0 + (i * 10),
-                    "close": 2005.0 + (i * 10),
-                    "volume": 100000 + (i * 1000),
-                    "fetched_at": datetime.now().isoformat(),
-                }
-                all_records.append(sample_record)
-        # Limit total records to the requested limit
-        if len(all_records) >= limit:
-            all_records = all_records[:limit]
-            break
+        else:
+            logger.warning(f"No data from service for {symbol}, skipping this symbol")
     
-    logger.info(f"Fetched {len(all_records)} records for {asset_type}")
+    logger.info(f"Fetched {len(all_records)} records for {len(symbols)} symbols")
     return all_records
 
 
-@task(name="compute_indicators")
-def compute_indicators(raw_prices: List[Dict]) -> List[Dict]:
+@task(name="store_data")
+def store_data(price_data: List[Dict], asset_type: str = "stocks") -> int:
     """
-    Computes simple indicators using database_app services.
-    Adds them into each dict as new keys.
-    Must NOT import from dagster_app or any Dagster tasks.
+    Store data using database_app services
     """
-    if not raw_prices:
-        return raw_prices
-    
-    # Compute indicators directly without problematic imports
-    results = []
-    for i, price_data in enumerate(raw_prices):
-        result = price_data.copy()
-        
-        # Calculate simple moving average (SMA) over last 5 prices
-        # and exponential moving average (EMA) with smoothing factor 0.3
-        # This is similar to the original implementation but using the same logic
-        sma_window = min(5, i + 1)
-        sma_sum = sum(raw_prices[j]["close"] if "close" in raw_prices[j] else raw_prices[j]["price"] for j in range(i - sma_window + 1, i + 1))
-        sma = sma_sum / sma_window
-        
-        # Exponential Moving Average (EMA) - with smoothing factor 0.3
-        if i == 0:
-            ema = price_data["close"] if "close" in price_data else price_data["price"]
-        else:
-            prev_ema = results[i-1].get("ema", price_data["close"] if "close" in price_data else price_data["price"])
-            current_price = price_data["close"] if "close" in price_data else price_data["price"]
-            ema = 0.3 * current_price + 0.7 * prev_ema
-        
-        # Add indicators to the result
-        result["sma"] = round(sma, 2)
-        result["ema"] = round(ema, 2)
-        
-        results.append(result)
-    
-    return results
-
-
-@task(name="store_results")
-def store_results(results: List[Dict]) -> int:
-    """
-    Stores data using database_app services.
-    Returns the number of inserted documents and prints a short log.
-    """
-    if not results:
+    if not price_data:
         print("No results to store")
         return 0
     
-    # Import and use the existing service functions from database_app
     from database_app.services.stock_services import store_stock_price_data
     from database_app.services.naming import naming
+    from main import get_collection
     
-    # Import MongoDB connection - try different possible paths
-    try:
-        from mongo_connection.src.mongo_connection.app import MongoConnection
-    except ImportError:
-        # Fallback import for different module structure
-        try:
-            from mongo_connection.app import MongoConnection
-        except ImportError:
-            # If all imports fail, use a mock connection for testing
-            class MockMongoConnection:
-                def __init__(self, uri):
-                    self.client = MockMongoClient()
-            
-            class MockMongoClient:
-                def __getitem__(self, name):
-                    return MockCollection()
-            
-            class MockCollection:
-                async def update_one(self, *args, **kwargs):
-                    return MockUpdateResult()
-            
-            class MockUpdateResult:
-                pass
-            
-            MongoConnection = MockMongoConnection
+    from servers.utils.logger import get_logger
+    logger = get_logger(__name__)
     
-    # Get MongoDB connection details
-    mongodb_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-    db_name = os.getenv("MONGODB_DB_NAME", "price_app")
+    # Get the symbol from first record if available
+    symbol = price_data[0].get("symbol", "DEFAULT") if price_data else "DEFAULT"
     
-    # Get the collection name using the naming convention service
-    symbol = results[0].get("symbol", "DEFAULT") if results else "DEFAULT"
-    collection_name = naming.get_price_collection_name("stocks", symbol)
+    # Get collection name using naming convention
+    collection_name = naming.get_price_collection_name(asset_type, symbol)
     
     try:
-        # Use the existing mongo connection
-        mongo_conn = MongoConnection(mongodb_uri)
-        db = mongo_conn.client[db_name]
-        collection = db[collection_name]
+        # Get the appropriate collection
+        db_name = naming.get_analysis_db_name(asset_type)
+        collection = get_collection(db_name, collection_name)
         
         # Format results to match expected structure for the service
-        formatted_data = {"symbol": symbol, "records": results, "count": len(results), "status": "success"}
+        formatted_data = {"symbol": symbol, "records": price_data, "count": len(price_data), "status": "success"}
         
         # Use the existing service function to store the data
         result = store_stock_price_data(formatted_data, collection)
         
         stored_count = result.get("count", 0) if result.get("status") == "success" else 0
-        print(f"Stored {stored_count} price records in MongoDB collection '{collection_name}'")
+        print(f"Stored {stored_count} price records in collection '{collection_name}'")
         return stored_count
         
     except Exception as e:
         print(f"Error storing results: {str(e)}")
         # Fallback: print results
-        for result in results[:3]:  # Print first 3 for brevity
+        for result in price_data[:3]:  # Print first 3 for brevity
             print(f"  - {result['symbol']}: ${result.get('close', result.get('price', 'N/A'))} (SMA: {result.get('sma', 'N/A')}, EMA: {result.get('ema', 'N/A')})")
-        print(f"  ... and {max(0, len(results) - 3)} more")
-        return len(results) if results else 0
+        print(f"  ... and {max(0, len(price_data) - 3)} more")
+        return len(price_data) if price_data else 0
+
+
+@task(name="compute_indicators")
+def compute_indicators(price_data: List[Dict], indicators_config: Dict, asset_type: str = "stocks") -> List[Dict]:
+    """
+    Compute indicators using database_app services
+    """
+    if not price_data:
+        return price_data
+    
+    from database_app.services.indicator_services import compute_single_factor
+    from servers.utils.logger import get_logger
+    
+    logger = get_logger(__name__)
+    
+    # Get symbol from first record if available
+    symbol = price_data[0].get("symbol", "DEFAULT") if price_data else "DEFAULT"
+    
+    # Get indicators to compute
+    indicators = indicators_config.get("indicators", {})
+    
+    results = []
+    for indicator_name in indicators.keys():
+        # Compute indicator using the service
+        indicator_config = indicators.get(indicator_name, {})
+        indicator_results = compute_single_factor(symbol, indicator_name, price_data, indicator_config)
+        logger.info(f"Computed {indicator_name} for {symbol}: {len(indicator_results)} records")
+        
+        # Add indicator name to results for tracking
+        for result in indicator_results:
+            result["indicator_type"] = indicator_name
+            results.append(result)
+    
+    return results
+
+
+@task(name="store_indicators")
+def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> int:
+    """
+    Store indicators using database_app services
+    """
+    if not indicator_data:
+        print("No indicator results to store")
+        return 0
+    
+    from database_app.services.indicator_services import store_single_factor
+    from database_app.services.naming import naming
+    from main import get_collection
+    
+    from servers.utils.logger import get_logger
+    logger = get_logger(__name__)
+    
+    # Group by indicator type to store separately
+    indicators_by_type = {}
+    for item in indicator_data:
+        indicator_type = item.get("indicator_type", "unknown")
+        if indicator_type not in indicators_by_type:
+            indicators_by_type[indicator_type] = []
+        indicators_by_type[indicator_type].append(item)
+    
+    total_stored = 0
+    for indicator_type, data in indicators_by_type.items():
+        if not data:
+            continue
+            
+        # Get symbol from first record
+        symbol = data[0].get("symbol", "DEFAULT")
+        
+        # Get collection name using naming convention
+        collection_name = naming.get_indicator_collection_name(asset_type, symbol, indicator_type)
+        
+        try:
+            # Get the appropriate collection
+            db_name = naming.get_analysis_db_name(asset_type)
+            collection = get_collection(db_name, collection_name)
+            
+            # Use the existing service function to store the indicators
+            result = store_single_factor(data, collection)
+            
+            stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
+            print(f"Stored {stored_count} {indicator_type} indicator records in collection '{collection_name}'")
+            total_stored += stored_count
+            
+        except Exception as e:
+            logger.error(f"Error storing {indicator_type} indicators for {symbol}: {e}")
+    
+    return total_stored
