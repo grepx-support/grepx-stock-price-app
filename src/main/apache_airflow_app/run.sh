@@ -52,7 +52,7 @@ echo "✓ Virtual environment ready"
 echo ""
 echo "▶ Step 3: Upgrading pip..."
 
-pip install --upgrade pip setuptools wheel
+pip install --upgrade pip setuptools wheel 2>&1
 echo "✓ pip upgraded"
 
 # ============================================================================
@@ -64,7 +64,7 @@ LOCAL_LIBS_DIR="$LOCAL_LIBS_DIR/libs"    # then into libs
 if [ -d "$LOCAL_LIBS_DIR" ]; then
     echo "▶ Installing all local libraries from $LOCAL_LIBS_DIR..."
     for lib in "$LOCAL_LIBS_DIR/"*; do
-        [ -d "$lib" ] && pip install -e "$lib"
+        [ -d "$lib" ] && pip install -e "$lib"  2>&1
     done
     echo "✓ Local libraries installed"
 else
@@ -80,7 +80,8 @@ echo "▶ Step 4: Installing Apache Airflow (constrained)..."
 
 pip install \
   "apache-airflow==${AIRFLOW_VERSION}" \
-  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt" \
+   2>&1
 
 echo "✓ Apache Airflow installed"
 
@@ -90,7 +91,7 @@ echo "✓ Apache Airflow installed"
 echo ""
 echo "▶ Step 5: Installing project requirements..."
 
-pip install -r "$PROJECT_ROOT/apache_airflow_app/requirements.txt"
+pip install -r "$PROJECT_ROOT/apache_airflow_app/requirements.txt" >/dev/null 2>&1
 
 echo "✓ Project dependencies installed"
 
