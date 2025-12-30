@@ -3,8 +3,6 @@ from typing import Dict, List
 from prefect import task
 from pathlib import Path
 from omegaconf import OmegaConf
-import datetime
-from datetime import datetime
 
 
 @task(name="config_prices")
