@@ -203,7 +203,7 @@ def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> 
             result = store_single_factor(data, collection)
             
             stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
-            print(f"Stored {stored_count} {indicator_type} indicator records in collection '{collection_name}'")
+            logger.info(f"Stored {stored_count} {indicator_type} indicator records in collection '{collection_name}'")
             total_stored += stored_count
             
         except Exception as e:
