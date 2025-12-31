@@ -20,7 +20,7 @@ log "PYTHONPATH: $PYTHONPATH"
 PID_FILE="logs/pids.txt"
 LOG_DIR="logs"
 
-# Start service
+# Start service (UNCHANGED)
 start_service() {
     local name=$1
     local cmd=$2
@@ -43,12 +43,12 @@ start_service() {
         log_error "$name failed to start. Check $log_file"
         return 1
     fi
-echo "${name}:${pid}" >> "$PID_FILE"
+    echo "${name}:${pid}" >> "$PID_FILE"
 
     log "$name started (PID: $pid)"
 }
 
-# Stop service
+# Stop service (UNCHANGED)
 stop_service() {
     local name=$1
     if [ ! -f "$PID_FILE" ]; then
@@ -66,12 +66,13 @@ stop_service() {
     fi
 }
 
-# Status check
+# Status check **FIXED: Added prefect-server**
 check_status() {
     log "Checking service status..."
     echo ""
+    
+    local services=("celery" "flower" "dagster" "prefect-worker" "prefect-server")
 
-    local services=("celery" "flower" "dagster" "prefect-worker")
     local all_running=true
 
     for service in "${services[@]}"; do
@@ -94,12 +95,13 @@ check_status() {
         log "All services are running"
         echo "  Flower: http://localhost:5555"
         echo "  Dagster: http://localhost:3000"
+        echo "  Prefect UI: http://127.0.0.1:4200"  # ← ADDED
     else
         log "Some services are not running"
     fi
 }
 
-# View logs
+# View logs (UNCHANGED)
 view_logs() {
     local service=$1
     local log_file="$LOG_DIR/${service}.log"
@@ -117,29 +119,34 @@ view_logs() {
     fi
 }
 
-# Deploy Prefect flows
+# Deploy Prefect flows (UNCHANGED)
 prefect_deploy() {
-  # Run Prefect deployment for price_app
-  cd "$PROJECT_ROOT" || exit 1
-  python -m price_app.src.main.prefect_app.deployments.deploy_price_flows
+    cd "$PROJECT_ROOT" || exit 1
+    python -m price_app.src.main.prefect_app.deployments.deploy_price_flows
+}
+
+# **NEW: Start Prefect server**
+prefect_server() {
+    cd "$PROJECT_ROOT" || exit 1
+    prefect server start --host 0.0.0.0 --port 4200
 }
 
 # Start Prefect worker
 prefect_worker() {
-  # Start Prefect worker for price-pool
-  cd "$PROJECT_ROOT" || exit 1
-  export PREFECT_API_URL="http://127.0.0.1:4200/api"
-  python -m prefect worker start --pool price-pool
+    cd "$PROJECT_ROOT" || exit 1
+    export PREFECT_API_URL="http://127.0.0.1:4200/api"
+    python -m prefect worker start --pool price-pool
 }
 
-# Stop all services by port (fallback when PID file is missing)
+# Stop all services by port (FIXED: Added port 4200)
 stop_by_ports() {
     log "Stopping all services by port..."
 
     # Kill processes by port
+    log "Killing processes on port 4200 (Prefect Server)..."  # ← ADDED
+    kill_port 4200
     log "Killing processes on port 3000 (Dagster)..."
     kill_port 3000
-
     log "Killing processes on port 5555 (Flower)..."
     kill_port 5555
     # Also try to kill by process name as fallback
@@ -147,6 +154,10 @@ stop_by_ports() {
     pkill -f "celery.*worker" 2>/dev/null || true
     pkill -f "flower" 2>/dev/null || true
     pkill -f "dagster" 2>/dev/null || true
+
+    pkill -f "prefect.*server" 2>/dev/null || true
+    pkill -f "prefect.*worker" 2>/dev/null || true
+
     # Clean up PID file if it exists
     [ -f "$PID_FILE" ] && rm -f "$PID_FILE" || true
 
@@ -156,34 +167,35 @@ stop_by_ports() {
 # Main commands
 case "$1" in
     start)
-        log "Starting all services..."        # Start core services
+        log "Starting all services..."
+        # Prefect Infrastructure FIRST (Server → Worker)
+        start_service "prefect-server" "prefect server start --host 0.0.0.0 --port 4200"
+        sleep 5  # Server startup time
+        
+        start_service "prefect-worker" \
+            "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
+        sleep 2
+        
+        # Other services
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         sleep 2
         start_service "flower" "celery -A celery_main:app flower --port=5555 --address=0.0.0.0"
         sleep 2
         start_service "dagster" "dagster dev -m dagster_main -h 0.0.0.0"
         sleep 2
-        # Start Prefect worker
-        # Start Prefect server first
-        start_service "prefect-server" "prefect server start --port 4200"
-        sleep 5
-
-        # Ensure pool exists
-        prefect work-pool create price-pool --type process || true
-
-        # Then start worker
-        start_service "prefect-worker" "PREFECT_API_URL=\"http://localhost:4200/api\" prefect worker start --pool price-pool"
         echo ""
         check_status
         ;;
-
+    
     stop)
         log "Stopping all services..."
         # Try to stop by PID first
+        stop_service "prefect-server"
+        stop_service "prefect-worker"
         stop_service "celery"
         stop_service "flower"
         stop_service "dagster"
-        stop_service "prefect-worker"
+        
         # Fallback: kill by ports if PID file is missing or empty
         if [ ! -f "$PID_FILE" ] || [ ! -s "$PID_FILE" ]; then
             log "PID file missing or empty, using port-based kill..."
@@ -193,43 +205,46 @@ case "$1" in
             pkill -f "celery.*worker" 2>/dev/null || true
             pkill -f "flower" 2>/dev/null || true
             pkill -f "dagster" 2>/dev/null || true
+            pkill -f "prefect.*server" 2>/dev/null || true
             pkill -f "prefect.*worker" 2>/dev/null || true
+            
             # Kill processes on ports as additional cleanup
+            kill_port 4200
             kill_port 3000
             kill_port 5555
         fi
         log "All services stopped"
         ;;
-
+    
     kill-ports|stop-ports)
         stop_by_ports
         ;;
-
+    
     restart)
         log "Restarting all services..."
         $0 stop
-        sleep 2
+        sleep 3
         $0 start
         ;;
-
+    
     status)
         check_status
         ;;
-
+    
     logs)
         if [ -z "$2" ]; then
-            log_error "Usage: ./run.sh logs {celery|flower|dagster|prefect} [tail|follow]"
+            log_error "Usage: ./run.sh logs {prefect-server|prefect-worker|celery|flower|dagster} [tail|follow]"
             exit 1
         fi
         view_logs "$2" "$3"
         ;;
-
+    
     celery)
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
+        sleep 2
         start_service "flower" "celery -A celery_main:app flower --port=5555"
-        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
         ;;
-
+    
     dagster)
         cd src/main
         dagster dev -m dagster_main
@@ -239,36 +254,42 @@ case "$1" in
         cd src/main
         flask --app flask_main:app run
         ;;
-
-    prefect)
-        start_service "prefect-worker" "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
-        ;;
-
-    prefect_deploy)
-        prefect_deploy
+    
+    prefect_server)
+        prefect_server
         ;;
 
     prefect_worker)
         prefect_worker
         ;;
-
+    
+    prefect_deploy)
+        prefect_deploy
+        ;;
+    
+    prefect_full)
+        prefect_server &
+        sleep 5
+        prefect_worker
+        ;;
 
     *)
-        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect|prefect_deploy|prefect_worker}"
+        echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect_server|prefect_worker|prefect_deploy|prefect_full}"
         echo ""
         echo "Commands:"
-        echo "  start          - Start all services (Celery, Flower, Dagster, Prefect)"
-        echo "  stop           - Stop all services (tries PID first, falls back to ports)"
-        echo "  restart        - Restart all services"
-        echo "  status         - Check service status"
-        echo "  logs           - View logs: ./run.sh logs {celery|flower|dagster|prefect} [tail]"
-        echo "  kill-ports     - Force stop all services by killing processes on ports 3000, 5555, 8080"
-        echo "  celery         - Start celery and flower only"
-        echo "  dagster        - Start dagster in foreground"
-        echo "  flask          - Start flask in foreground"
-        echo "  prefect        - Start Prefect worker only"
-        echo "  prefect_deploy - Deploy Prefect flows"
-        echo "  prefect_worker - Start Prefect worker for price-pool"
+        echo "  start           - Start ALL services (Prefect+Celery+Dagster)"
+        echo "  stop            - Stop ALL services"
+        echo "  restart         - Restart ALL services"
+        echo "  status          - Check service status"
+        echo "  logs            - View logs: ./run.sh logs prefect-server [tail]"
+        echo "  kill-ports      - Force stop by ports (4200,3000,5555)"
+        echo "  celery          - Celery + Flower only"
+        echo "  dagster         - Dagster UI (3000)"
+        echo "  flask           - Flask app"
+        echo "  prefect_server  - Prefect UI (4200)"
+        echo "  prefect_worker  - Prefect Worker (price-pool)"
+        echo "  prefect_deploy  - Deploy Prefect flows"
+        echo "  prefect_full    - Prefect Server + Worker"
         exit 1
         ;;
 esac

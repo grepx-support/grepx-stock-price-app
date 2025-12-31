@@ -1,28 +1,45 @@
 from prefect import flow
-from prefect_app.tasks.price_tasks import fetch_raw_prices, compute_indicators, store_results
+import sys
+from pathlib import Path
+
+# Add the main directory to the path to import modules
+main_dir = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(main_dir))
+
+from prefect_app.tasks.price_tasks import (
+    config_prices,
+    config_indicators,
+    fetch_data,
+    store_data,
+    compute_indicators,
+    store_indicators
+)
 
 
-@flow(name="Price ETL Flow", log_prints=True)
-def price_etl_flow(limit: int = 100) -> int:
-    """
-    1) fetch_raw_prices(limit)
-    2) compute_indicators(...)
-    3) store_results(...)
-    Return inserted document count.
-    """
-    # Step 1: Fetch raw prices
-    raw_prices = fetch_raw_prices(limit)
+@flow(name="Generic Asset ETL Pipeline")
+def generic_asset_etl(asset_type: str = "stocks", limit: int = 100):
+    """Generic ETL for stocks/futures/indices using service functions"""
+    # Step 1: Get configurations
+    prices_config = config_prices(asset_type)
+    indicators_config = config_indicators(asset_type)
     
-    # Step 2: Compute indicators
-    results = compute_indicators(raw_prices)
+    # Step 2: Fetch and store data
+    price_data = fetch_data(prices_config)
+    stored_count = store_data(price_data, asset_type)
     
-    # Step 3: Store results
-    inserted_count = store_results(results)
+    # Step 3: Compute and store indicators
+    indicator_data = compute_indicators(price_data, indicators_config, asset_type)
+    indicators_stored = store_indicators(indicator_data, asset_type)
     
-    return inserted_count
+    return {
+        "asset_type": asset_type,
+        "price_records_stored": stored_count,
+        "indicator_records_stored": indicators_stored,
+        "total_records_processed": len(price_data) if price_data else 0
+    }
 
 
 if __name__ == "__main__":
     # Run the flow locally for testing
-    result = price_etl_flow(limit=10)
-    print(f"Flow completed. Inserted {result} documents.")
+    result = generic_asset_etl(asset_type="stocks", limit=10)
+    print(f"Flow completed. Result: {result}")

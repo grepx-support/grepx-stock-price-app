@@ -33,13 +33,23 @@ class SimpleAppLogger:
 
 
 class Application:
+    """Application singleton - loads config and manages connections once.
+
+    Uses connection factory pattern for extensibility:
+    - Register custom connection types
+    - Connections are cached and reused
+    - Single event loop for all async operations
+    """
+
     _instance = None
     _initialized = False
+
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
 
     def __init__(self):
         if self._initialized:
@@ -202,9 +212,19 @@ class Application:
         except Exception as e:
             self.logger.error(f"Failed to get connection '{conn_id}': {e}", exc_info=True)
             raise
-    
+
     def get_database(self, db_name: str):
-        """Get database by name."""
+        """Get database by name.
+
+        Args:
+            db_name: Database name (e.g., 'stocks_db', 'indices_db', 'futures_db')
+
+        Returns:
+            Database client object
+
+        Example:
+            db = app.get_database("stocks_db")
+        """
         try:
             self.logger.debug(f"Getting database: {db_name}")
             db_conn = self.get_connection("primary_db")
@@ -214,17 +234,34 @@ class Application:
         except Exception as e:
             self.logger.error(f"Failed to get database '{db_name}': {e}", exc_info=True)
             raise
-    
+
     def get_collection(self, db_name: str, collection_name: str):
-        """Get collection."""
+        """Get collection from database.
+
+        Args:
+            db_name: Database name
+            collection_name: Collection name
+
+        Returns:
+            Collection client object for direct MongoDB operations
+
+        Example:
+            collection = app.get_collection("stocks_db", "prices")
+            collection.insert_one({"symbol": "AAPL", "price": 150})
+        """
         try:
             self.logger.debug(f"Getting collection: {db_name}.{collection_name}")
             db_conn = self.get_connection("primary_db")
             collection = db_conn.get_collection(db_name, collection_name)
-            self.logger.debug(f"Collection '{db_name}.{collection_name}' retrieved successfully")
+            self.logger.debug(
+                f"Collection '{db_name}.{collection_name}' retrieved successfully"
+            )
             return collection
         except Exception as e:
-            self.logger.error(f"Failed to get collection '{db_name}.{collection_name}': {e}", exc_info=True)
+            self.logger.error(
+                f"Failed to get collection '{db_name}.{collection_name}': {e}",
+                exc_info=True,
+            )
             raise
         
     def get_prefect_flows(self):

@@ -2,11 +2,40 @@
 All _main.py files should import from here.
 """
 
-import sys
-from pathlib import Path
+try:
+    # Setup paths FIRST before importing apps
+    import sys
+    from pathlib import Path
+    prefect_framework_path = Path(__file__).parent / "libs" / "prefect_framework" / "src"
+    if prefect_framework_path.exists():
+        sys.path.insert(0, str(prefect_framework_path))
 
-# Safe path addition (no side effects)
-sys.path.insert(0, str(Path(__file__).parent / "libs" / "prefect_framework" / "src"))
+    # Import apps to register connection types
+    import database_app
+    import celery_app
+    import dagster_app
+    import prefect_app  # Will gracefully handle missing prefect_framework
+
+    from servers.config import ConfigLoader
+    from grepx_connection_registry import ConnectionManager
+    from servers.app.application import Application
+    from servers.utils.logger import get_logger
+    
+    # Initialize application singleton (this will also initialize logging)
+    app = Application()
+    logger = app.logger
+    
+    logger.info("Main module initialized")
+    logger.debug("Application singleton created successfully")
+    logger.debug("Connection types registered: database, celery, dagster, prefect (if available)")
+    
+    # Convenient exports
+    get_connection = app.get_connection
+    get_database = app.get_database
+    get_collection = app.get_collection
+    get_app = lambda: app  # Return the application singleton
+    config = app.config
+    connections = app.connections
 
 # Global lazy singleton
 _app_instance = None

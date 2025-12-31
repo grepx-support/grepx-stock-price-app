@@ -83,6 +83,9 @@ dagster_home/
 *.sqlite*
 flower.db
 celerybeat-schedule.db
+stocks_analysis
+indices_analysis
+futures_analysis
 
 # ===============================
 # Temporary files
