@@ -1,5 +1,11 @@
 """Main entry point - Initialize application and export functions.
+
 All _main.py files should import from here.
+
+For PyCharm debugging, use separate run configurations:
+1. Celery: Run celery_main.py or use: celery -A celery_main:app worker
+2. Flower: Use: celery -A celery_main:app flower --port=5555
+3. Dagster: Run dagster_main.py or use: dagster dev -m dagster_main
 """
 
 try:
@@ -36,6 +42,12 @@ try:
     get_app = lambda: app  # Return the application singleton
     config = app.config
     connections = app.connections
+
+except Exception as e:
+    print(f"ERROR: Failed to initialize application: {e}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 # Global lazy singleton
 _app_instance = None
@@ -106,19 +118,25 @@ def get_connections():
 if __name__ == "__main__":
     """
     Start all services (Celery, Flower, Dagster) for testing.
+    
+    NOTE: For debugging with breakpoints, use separate PyCharm run configurations:
+    1. Celery: Script path=celery_main.py, Parameters: (leave empty, celery CLI handles it)
+       Or use: Module=celery, Parameters: -A celery_main:app worker --loglevel=info
+    2. Flower: Module=celery, Parameters: -A celery_main:app flower --port=5555
+    3. Dagster: Module=dagster, Parameters: dev -m dagster_main
     """
     import subprocess
     import sys
     import time
     import os
     from pathlib import Path
-
+    
     processes = []
-
+    
     # Force initialization early for __main__
     app = _initialize_application()
     logger = app.logger
-
+    
     def cleanup():
         """Stop all processes on exit."""
         logger.info("Shutting down services...")
@@ -141,13 +159,13 @@ if __name__ == "__main__":
     # Set working directory to main.py's directory
     main_dir = Path(__file__).parent
     os.chdir(main_dir)
-
+    
     logger.info("=" * 60)
     logger.info("Starting all services...")
     logger.warning("NOTE: Services run in subprocesses. For debugging, use separate PyCharm run configurations.")
     logger.info("Press Ctrl+C to stop all services")
     logger.info("=" * 60)
-
+    
     try:
         # Detect Windows platform for pool configuration
         import platform
@@ -170,7 +188,7 @@ if __name__ == "__main__":
             sys.executable, "-m", "celery", "-A", "celery_main:app", "worker",
             "--loglevel=info",
             f"--pool={pool_type}",
-            "-n", node_name
+            f"-n", node_name
         ]
         logger.debug("Celery command: %s", " ".join(celery_cmd))
         
@@ -181,7 +199,8 @@ if __name__ == "__main__":
             encoding='utf-8'
         )
         processes.append(celery_worker)
-        logger.info("Celery worker started (PID: %s)", celery_worker.pid)
+        logger.info("Celery worker started (PID: %s, pool=%s, node=%s)", 
+                   celery_worker.pid, pool_type, node_name)
         
         # Check if worker started successfully (give it a moment)
         time.sleep(2)
