@@ -120,15 +120,16 @@ if __name__ == "__main__":
     logger = app.logger
 
     def cleanup():
+        """Stop all processes on exit."""
         logger.info("Shutting down services...")
         for p in processes:
             try:
-                if p.poll() is None:
+                if p.poll() is None:  # Process still running
                     logger.debug("Terminating process PID: %s", p.pid)
                     p.terminate()
             except Exception as e:
                 logger.warning("Error terminating process %s: %s", p.pid, e)
-            time.sleep(1)
+        time.sleep(1)
         for p in processes:
             try:
                 if p.poll() is None:
@@ -136,27 +137,34 @@ if __name__ == "__main__":
                     p.kill()
             except Exception as e:
                 logger.warning("Error killing process %s: %s", p.pid, e)
-
+    
+    # Set working directory to main.py's directory
     main_dir = Path(__file__).parent
     os.chdir(main_dir)
 
     logger.info("=" * 60)
     logger.info("Starting all services...")
-    logger.warning("NOTE: Services run in subprocesses...")
+    logger.warning("NOTE: Services run in subprocesses. For debugging, use separate PyCharm run configurations.")
     logger.info("Press Ctrl+C to stop all services")
     logger.info("=" * 60)
 
     try:
+        # Detect Windows platform for pool configuration
         import platform
         is_windows = platform.system() == "Windows"
+        
+        # Use 'solo' pool on Windows to avoid PermissionError with billiard
+        # On Linux/Unix, can use 'prefork' for better performance
         pool_type = "solo" if is_windows else "prefork"
-
+        
+        # Generate unique node name to avoid duplicate node warnings
         import socket
         import random
         hostname = socket.gethostname()
         node_suffix = random.randint(1000, 9999)
         node_name = f"celery@{hostname}.{node_suffix}"
-
+        
+        # Start Celery worker with Windows-compatible configuration
         logger.info("Starting Celery worker (pool=%s, node=%s)...", pool_type, node_name)
         celery_cmd = [
             sys.executable, "-m", "celery", "-A", "celery_main:app", "worker",
@@ -164,7 +172,9 @@ if __name__ == "__main__":
             f"--pool={pool_type}",
             "-n", node_name
         ]
-
+        logger.debug("Celery command: %s", " ".join(celery_cmd))
+        
+        # Start Celery worker (let output go to console for debugging)
         celery_worker = subprocess.Popen(
             celery_cmd,
             cwd=str(main_dir),
@@ -172,7 +182,8 @@ if __name__ == "__main__":
         )
         processes.append(celery_worker)
         logger.info("Celery worker started (PID: %s)", celery_worker.pid)
-
+        
+        # Check if worker started successfully (give it a moment)
         time.sleep(2)
         if celery_worker.poll() is not None:
             logger.error("Celery worker exited immediately with code %s", celery_worker.returncode)
@@ -207,9 +218,10 @@ if __name__ == "__main__":
         logger.info("  Flower: http://localhost:5555 (PID: %s)", flower.pid)
         logger.info("  Dagster: http://localhost:3000 (PID: %s)", dagster.pid)
         logger.info("=" * 60)
-
+        
+        # Wait for Dagster (it runs in foreground)
         dagster.wait()
-
+        
     except KeyboardInterrupt:
         logger.warning("Received interrupt signal (Ctrl+C)...")
     except Exception as e:
