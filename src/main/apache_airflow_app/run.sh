@@ -109,8 +109,8 @@ AIRFLOW_CFG="$AIRFLOW_HOME/airflow.cfg"
 if [ ! -f "$AIRFLOW_CFG" ]; then
 cat > "$AIRFLOW_CFG" << 'EOF'
 [core]
-dags_folder = /Users/mahesh/Desktop/Projects/grepx-orchestrator/price_app/src/main/apache_airflow_app/dags
-base_log_folder = /Users/mahesh/Desktop/Projects/grepx-orchestrator/price_app/src/main/apache_airflow_app/logs
+dags_folder = /home/ubuntu/grepx-orchestrator/price_app/src/main/apache_airflow_app/dags
+base_log_folder = /home/ubuntu/grepx-orchestrator/price_app/src/main/apache_airflow_app/logs
 executor = SequentialExecutor
 parallelism = 4
 max_active_tasks_per_dag = 2
