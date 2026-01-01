@@ -128,14 +128,14 @@ prefect_deploy() {
 # **NEW: Start Prefect server**
 prefect_server() {
     cd "$PROJECT_ROOT" || exit 1
-    prefect server start --host 0.0.0.0 --port 4200
+    start_service "prefect-server" "prefect server start --host 0.0.0.0 --port 4200"
 }
 
 # Start Prefect worker
 prefect_worker() {
     cd "$PROJECT_ROOT" || exit 1
-    export PREFECT_API_URL="http://127.0.0.1:4200/api"
-    python -m prefect worker start --pool price-pool
+    export PREFECT_API_URL="http://stock-analysis.grepx.sg:4200/api"
+    start_service "prefect-worker" "python -m prefect worker start --pool price-pool"
 }
 
 # Stop all services by port (FIXED: Added port 4200)
@@ -169,11 +169,9 @@ case "$1" in
     start)
         log "Starting all services..."
         # Prefect Infrastructure FIRST (Server → Worker)
-        start_service "prefect-server" "prefect server start --host 0.0.0.0 --port 4200"
+        prefect_server
         sleep 5  # Server startup time
-        
-        start_service "prefect-worker" \
-            "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
+        prefect_worker
         sleep 2
         
         # Other services
