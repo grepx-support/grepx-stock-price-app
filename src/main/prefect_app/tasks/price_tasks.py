@@ -67,7 +67,7 @@ def fetch_data(config_data: Dict) -> List[Dict]:
     
     all_records = []
     for symbol in symbols:
-        result = fetch_stock_price_data(symbol)
+        result = fetch_stock_price_data(symbol, start_date, end_date)
         if result["status"] == "success" and result["records"]:
             all_records.extend(result["records"])
         else:
@@ -85,42 +85,51 @@ def store_data(price_data: List[Dict], asset_type: str = "stocks") -> int:
     if not price_data:
         print("No results to store")
         return 0
-    
     from database_app.services.stock_services import store_stock_price_data
     from database_app.services.naming import naming
-    from main import get_collection
-    
+    from main import get_app
     from servers.utils.logger import get_logger
     logger = get_logger(__name__)
-    
-    # Get the symbol from first record if available
-    symbol = price_data[0].get("symbol", "DEFAULT") if price_data else "DEFAULT"
-    
-    # Get collection name using naming convention
-    collection_name = naming.get_price_collection_name(asset_type, symbol)
-    
-    try:
-        # Get the appropriate collection
-        db_name = naming.get_analysis_db_name(asset_type)
-        collection = get_collection(db_name, collection_name)
-        
-        # Format results to match expected structure for the service
-        formatted_data = {"symbol": symbol, "records": price_data, "count": len(price_data), "status": "success"}
-        
-        # Use the existing service function to store the data
-        result = store_stock_price_data(formatted_data, collection)
-        
-        stored_count = result.get("count", 0) if result.get("status") == "success" else 0
-        print(f"Stored {stored_count} price records in collection '{collection_name}'")
-        return stored_count
-        
-    except Exception as e:
-        print(f"Error storing results: {str(e)}")
-        # Fallback: print results
-        for result in price_data[:3]:  # Print first 3 for brevity
-            print(f"  - {result['symbol']}: ${result.get('close', result.get('price', 'N/A'))} (SMA: {result.get('sma', 'N/A')}, EMA: {result.get('ema', 'N/A')})")
-        print(f"  ... and {max(0, len(price_data) - 3)} more")
-        return len(price_data) if price_data else 0
+
+    # Get the ORM session once
+    app = get_app()
+    conn = app.get_connection('primary_db')
+    session = conn._session
+    db_name = naming.get_analysis_db_name(asset_type)
+
+    # Group data by symbol to store each symbol in its own table
+    data_by_symbol = {}
+    for record in price_data:
+        symbol = record.get("symbol", "DEFAULT")
+        if symbol not in data_by_symbol:
+            data_by_symbol[symbol] = []
+        data_by_symbol[symbol].append(record)
+
+    total_stored = 0
+    for symbol, symbol_data in data_by_symbol.items():
+        # Get collection name using naming convention
+        collection_name = naming.get_price_collection_name(asset_type, symbol)
+
+        try:
+            # Format data as expected by the service function
+            formatted_data = {
+                "symbol": symbol,
+                "records": symbol_data,
+                "status": "success",
+                "count": len(symbol_data)
+            }
+
+            # Use the existing service function to store the data
+            result = store_stock_price_data(formatted_data, session, db_name, collection_name)
+
+            stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
+            logger.info(f"Stored {stored_count} price records in collection '{collection_name}'")
+            total_stored += stored_count
+
+        except Exception as e:
+            logger.error(f"Error storing price data for {symbol}: {str(e)}")
+
+    return total_stored
 
 
 @task(name="compute_indicators")
@@ -129,31 +138,34 @@ def compute_indicators(price_data: List[Dict], indicators_config: Dict, asset_ty
     Compute indicators using database_app services
     """
     if not price_data:
-        return price_data
-    
+        return []
+
     from database_app.services.indicator_services import compute_single_factor
     from servers.utils.logger import get_logger
-    
     logger = get_logger(__name__)
-    
-    # Get symbol from first record if available
-    symbol = price_data[0].get("symbol", "DEFAULT") if price_data else "DEFAULT"
-    
     # Get indicators to compute
     indicators = indicators_config.get("indicators", {})
-    
+
+    # Group data by symbol to compute indicators for each symbol separately
+    data_by_symbol = {}
+    for record in price_data:
+        symbol = record.get("symbol", "DEFAULT")
+        if symbol not in data_by_symbol:
+            data_by_symbol[symbol] = []
+        data_by_symbol[symbol].append(record)
+
     results = []
-    for indicator_name in indicators.keys():
-        # Compute indicator using the service
-        indicator_config = indicators.get(indicator_name, {})
-        indicator_results = compute_single_factor(symbol, indicator_name, price_data, indicator_config)
-        logger.info(f"Computed {indicator_name} for {symbol}: {len(indicator_results)} records")
-        
-        # Add indicator name to results for tracking
-        for result in indicator_results:
-            result["indicator_type"] = indicator_name
-            results.append(result)
-    
+    for symbol, symbol_data in data_by_symbol.items():
+        for indicator_name in indicators.keys():
+            # Compute indicator using the service
+            indicator_config = indicators.get(indicator_name, {})
+            indicator_results = compute_single_factor(symbol, indicator_name, symbol_data, indicator_config)
+            logger.info(f"Computed {indicator_name} for {symbol}: {len(indicator_results)} records")
+            # Add indicator name to results for tracking
+            for result in indicator_results:
+                result["indicator_type"] = indicator_name
+                results.append(result)
+
     return results
 
 
@@ -168,42 +180,46 @@ def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> 
     
     from database_app.services.indicator_services import store_single_factor
     from database_app.services.naming import naming
-    from main import get_collection
-    
+    from main import get_app
     from servers.utils.logger import get_logger
     logger = get_logger(__name__)
-    
-    # Group by indicator type to store separately
-    indicators_by_type = {}
+    # Group by symbol and indicator type to store each combination separately
+    indicators_by_symbol_and_type = {}
     for item in indicator_data:
+        symbol = item.get("symbol", "DEFAULT")
         indicator_type = item.get("indicator_type", "unknown")
-        if indicator_type not in indicators_by_type:
-            indicators_by_type[indicator_type] = []
-        indicators_by_type[indicator_type].append(item)
-    
+        key = f"{symbol}_{indicator_type}"
+
+        if key not in indicators_by_symbol_and_type:
+            indicators_by_symbol_and_type[key] = {
+                "symbol": symbol,
+                "indicator_type": indicator_type,
+                "data": []
+            }
+        indicators_by_symbol_and_type[key]["data"].append(item)
+
+    # Get the ORM session once
+    app = get_app()
+    conn = app.get_connection('primary_db')
+    session = conn._session
+    db_name = naming.get_analysis_db_name(asset_type)
+
     total_stored = 0
-    for indicator_type, data in indicators_by_type.items():
+    for key, item_info in indicators_by_symbol_and_type.items():
+        symbol = item_info["symbol"]
+        indicator_type = item_info["indicator_type"]
+        data = item_info["data"]
+
         if not data:
             continue
-            
-        # Get symbol from first record
-        symbol = data[0].get("symbol", "DEFAULT")
-        
         # Get collection name using naming convention
         collection_name = naming.get_indicator_collection_name(asset_type, symbol, indicator_type)
-        
         try:
-            # Get the appropriate collection
-            db_name = naming.get_analysis_db_name(asset_type)
-            collection = get_collection(db_name, collection_name)
-            
             # Use the existing service function to store the indicators
-            result = store_single_factor(data, collection)
-            
+            result = store_single_factor(data, session, db_name, collection_name)
             stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
             logger.info(f"Stored {stored_count} {indicator_type} indicator records in collection '{collection_name}'")
             total_stored += stored_count
-            
         except Exception as e:
             logger.error(f"Error storing {indicator_type} indicators for {symbol}: {e}")
     
