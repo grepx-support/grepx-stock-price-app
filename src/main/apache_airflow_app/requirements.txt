@@ -81,7 +81,6 @@ graphql-core==3.2.7
 graphql-relay==3.2.0
 graphviz==0.21
 greenlet==3.3.0
-grepx-connection-registry @ file:////home/ubuntu/grepx-orchestrator/libs/connection_registry
 griffe==1.15.0
 grpcio==1.67.1
 gunicorn==23.0.0
@@ -130,7 +129,6 @@ oauthlib==3.3.1
 omegaconf==2.3.0
 ordered-set==4.1.0
 orjson==3.11.5
-ormlib @ file:////home/ubuntu/grepx-orchestrator/libs/grepx-orm-libs
 packaging==24.1
 pandas==2.2.3
 pathspec==0.12.1
