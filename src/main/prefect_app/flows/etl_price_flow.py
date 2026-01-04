@@ -19,23 +19,28 @@ from prefect_app.tasks.price_tasks import (
 @flow(name="Generic Asset ETL Pipeline")
 def generic_asset_etl(asset_type: str = "stocks", limit: int = 100):
     """Generic ETL for stocks/futures/indices using service functions"""
-    # Step 1: Get configurations
+    # Step 1: Get configurations (equivalent to Dagster config assets)
     prices_config = config_prices(asset_type)
     indicators_config = config_indicators(asset_type)
     
-    # Step 2: Fetch and store data
+    # Step 2: Fetch data (equivalent to Dagster fetch asset)
     price_data = fetch_data(prices_config)
-    stored_count = store_data(price_data, asset_type)
     
-    # Step 3: Compute and store indicators
+    # Step 3: Store data (equivalent to Dagster store asset)
+    stored_results = store_data(price_data, asset_type)
+    
+    # Step 4: Compute indicators (equivalent to Dagster indicator assets)
     indicator_data = compute_indicators(price_data, indicators_config, asset_type)
+    
+    # Step 5: Store indicators (equivalent to Dagster store indicators asset)
     indicators_stored = store_indicators(indicator_data, asset_type)
     
     return {
         "asset_type": asset_type,
-        "price_records_stored": stored_count,
+        "price_data_fetched": len(price_data) if price_data else 0,
+        "price_records_stored": stored_results,
         "indicator_records_stored": indicators_stored,
-        "total_records_processed": len(price_data) if price_data else 0
+        "indicators_computed": len(indicator_data) if indicator_data else 0
     }
 
 
