@@ -12,6 +12,13 @@ def fetch_stock_price_data(symbol: str, start_date: str = None, end_date: str = 
     """Fetch stock prices from Yahoo Finance"""
     try:
         stock = yf.Ticker(symbol)
+
+        # Convert string dates to datetime objects if provided
+        if isinstance(start_date, str):
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        if isinstance(end_date, str):
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+
         data = stock.history(start=start_date, end=end_date)
         records = [{
             "symbol": symbol,
