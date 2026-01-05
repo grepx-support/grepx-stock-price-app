@@ -21,14 +21,32 @@ class NamingConvention:
             return value
 
     def get_analysis_db_name(self, asset_type: str) -> str:
+        """Get database name for asset type from asset.yaml database_naming config."""
+        from servers.app import Application
+
+        if not asset_type or asset_type.strip() == "":
+            raise ValueError("asset_type cannot be empty or None")
+
+        app = Application()
+        asset_type = asset_type.lower().strip()
+
+        # Try to get from asset.yaml database_naming section
+        if hasattr(app.config, 'database_naming'):
+            db_name = app.config.database_naming.get(asset_type)
+            if db_name:
+                db_name_str = str(db_name).strip()
+                if db_name_str:
+                    return db_name_str
+
+        # Fallback to hardcoded mapping
         db_map = {
             "stocks": "stocks_analysis",
             "indices": "indices_analysis",
             "futures": "futures_analysis",
         }
-        db_name = db_map.get(asset_type.lower())
-        if not db_name:
-            raise ValueError(f"Unknown asset_type: {asset_type}")
+        db_name = db_map.get(asset_type)
+        if not db_name or db_name.strip() == "":
+            raise ValueError(f"Unknown or empty database name for asset_type: {asset_type}")
         return db_name
 
     def get_price_collection_name(self, asset_type: str, symbol: str) -> str:

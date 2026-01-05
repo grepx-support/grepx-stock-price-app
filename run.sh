@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -e
 
 cd "$(dirname "$0")"
 source common.sh
@@ -35,9 +35,16 @@ start_service() {
     fi
 
     log "Starting $name..."
+    # Ensure PYTHONPATH is set in the command for background processes
     eval "PYTHONPATH=\"$PYTHONPATH\" $cmd >> $log_file 2>&1 &"
     local pid=$!
+    sleep 1
+    if ! is_running "$pid"; then
+        log_error "$name failed to start. Check $log_file"
+        return 1
+    fi
     echo "${name}:${pid}" >> "$PID_FILE"
+
     log "$name started (PID: $pid)"
 }
 
@@ -64,7 +71,8 @@ check_status() {
     log "Checking service status..."
     echo ""
     
-    local services=("celery" "flower" "dagster" "prefect-worker" "prefect-server")  # ← ADDED prefect-server
+    local services=("celery" "flower" "dagster" "prefect-worker" "prefect-server")
+
     local all_running=true
 
     for service in "${services[@]}"; do
@@ -120,14 +128,14 @@ prefect_deploy() {
 # **NEW: Start Prefect server**
 prefect_server() {
     cd "$PROJECT_ROOT" || exit 1
-    prefect server start --host 0.0.0.0 --port 4200
+    start_service "prefect-server" "prefect server start --host 0.0.0.0 --port 4200"
 }
 
 # Start Prefect worker
 prefect_worker() {
     cd "$PROJECT_ROOT" || exit 1
-    export PREFECT_API_URL="http://127.0.0.1:4200/api"
-    python -m prefect worker start --pool price-pool
+    export PREFECT_API_URL="http://stock-analysis.grepx.sg:4200/api"
+    start_service "prefect-worker" "python -m prefect worker start --pool price-pool"
 }
 
 # Stop all services by port (FIXED: Added port 4200)
@@ -141,12 +149,12 @@ stop_by_ports() {
     kill_port 3000
     log "Killing processes on port 5555 (Flower)..."
     kill_port 5555
-
     # Also try to kill by process name as fallback
     log "Killing processes by name..."
     pkill -f "celery.*worker" 2>/dev/null || true
     pkill -f "flower" 2>/dev/null || true
     pkill -f "dagster" 2>/dev/null || true
+
     pkill -f "prefect.*server" 2>/dev/null || true
     pkill -f "prefect.*worker" 2>/dev/null || true
 
@@ -161,21 +169,18 @@ case "$1" in
     start)
         log "Starting all services..."
         # Prefect Infrastructure FIRST (Server → Worker)
-        start_service "prefect-server" "prefect server start --host 0.0.0.0 --port 4200"
+        prefect_server
         sleep 5  # Server startup time
-        
-        start_service "prefect-worker" \
-            "PYTHONPATH=\"$PYTHONPATH\" PREFECT_API_URL=\"http://127.0.0.1:4200/api\" python -m prefect worker start --pool price-pool"
+        prefect_worker
         sleep 2
         
         # Other services
         start_service "celery" "celery -A celery_main:app worker --loglevel=info"
         sleep 2
-        start_service "flower" "celery -A celery_main:app flower --port=5555"
+        start_service "flower" "celery -A celery_main:app flower --port=5555 --address=0.0.0.0"
         sleep 2
-        start_service "dagster" "dagster dev -m dagster_main"
+        start_service "dagster" "dagster dev -m dagster_main -h 0.0.0.0"
         sleep 2
-        
         echo ""
         check_status
         ;;
@@ -242,7 +247,7 @@ case "$1" in
         cd src/main
         dagster dev -m dagster_main
         ;;
-    
+
     flask)
         cd src/main
         flask --app flask_main:app run
@@ -251,7 +256,7 @@ case "$1" in
     prefect_server)
         prefect_server
         ;;
-    
+
     prefect_worker)
         prefect_worker
         ;;
@@ -265,7 +270,7 @@ case "$1" in
         sleep 5
         prefect_worker
         ;;
-    
+
     *)
         echo "Usage: ./run.sh {start|stop|restart|status|logs|kill-ports|celery|dagster|flask|prefect_server|prefect_worker|prefect_deploy|prefect_full}"
         echo ""

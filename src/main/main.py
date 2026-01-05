@@ -9,16 +9,18 @@ For PyCharm debugging, use separate run configurations:
 """
 
 try:
-    # Import apps FIRST to register connection types
+    # Setup paths FIRST before importing apps
+    import sys
+    from pathlib import Path
+    prefect_framework_path = Path(__file__).parent / "libs" / "prefect_framework" / "src"
+    if prefect_framework_path.exists():
+        sys.path.insert(0, str(prefect_framework_path))
+
+    # Import apps to register connection types
     import database_app
     import celery_app
     import dagster_app
-    import prefect_app
-    # Import the Prefect framework
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent / "libs" / "prefect_framework" / "src"))
-    import prefect_framework
+    import prefect_app  # Will gracefully handle missing prefect_framework
 
     from servers.config import ConfigLoader
     from grepx_connection_registry import ConnectionManager
@@ -31,12 +33,13 @@ try:
     
     logger.info("Main module initialized")
     logger.debug("Application singleton created successfully")
-    logger.debug("Connection types registered: database, celery, dagster, prefect")
+    logger.debug("Connection types registered: database, celery, dagster, prefect (if available)")
     
     # Convenient exports
     get_connection = app.get_connection
     get_database = app.get_database
     get_collection = app.get_collection
+    get_app = lambda: app  # Return the application singleton
     config = app.config
     connections = app.connections
 
@@ -46,7 +49,72 @@ except Exception as e:
     traceback.print_exc()
     raise
 
+# Global lazy singleton
+_app_instance = None
 
+def _initialize_application():
+    """Lazily initialize and return the Application singleton."""
+    global _app_instance
+    if _app_instance is not None:
+        return _app_instance
+
+    print("[MAIN] Starting lazy initialization of Application", file=sys.stderr)
+
+    try:
+        # Import heavy modules only when needed
+        import database_app
+        import celery_app
+        import dagster_app
+        import prefect_app
+
+        from servers.app.application import Application
+        from servers.utils.logger import get_logger
+
+        print("[MAIN] Creating Application instance...", file=sys.stderr)
+        _app_instance = Application()
+        print("[MAIN] Application instance created successfully", file=sys.stderr)
+
+        logger = _app_instance.logger
+        logger.info("Main module lazily initialized")
+        logger.debug("Application singleton created successfully")
+        logger.debug("Connection types registered: database, celery, dagster, prefect")
+
+        return _app_instance
+
+    except Exception as e:
+        print(f"[MAIN] FATAL ERROR during lazy initialization: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        raise
+
+
+# Lazy exports
+def get_connection(conn_id: str):
+    app = _initialize_application()
+    return app.get_connection(conn_id)
+
+
+def get_database(db_name: str):
+    app = _initialize_application()
+    return app.get_database(db_name)
+
+
+def get_collection(db_name: str, collection_name: str):
+    app = _initialize_application()
+    return app.get_collection(db_name, collection_name)
+
+
+def get_config():
+    app = _initialize_application()
+    return app.config
+
+
+def get_connections():
+    app = _initialize_application()
+    return app.connections
+
+
+# Keep __main__ block for direct execution (unchanged)
 if __name__ == "__main__":
     """
     Start all services (Celery, Flower, Dagster) for testing.
@@ -65,8 +133,9 @@ if __name__ == "__main__":
     
     processes = []
     
-    # Use logger from app (already initialized)
-    logger = get_logger(__name__)
+    # Force initialization early for __main__
+    app = _initialize_application()
+    logger = app.logger
     
     def cleanup():
         """Stop all processes on exit."""
@@ -108,8 +177,8 @@ if __name__ == "__main__":
         
         # Generate unique node name to avoid duplicate node warnings
         import socket
-        hostname = socket.gethostname()
         import random
+        hostname = socket.gethostname()
         node_suffix = random.randint(1000, 9999)
         node_name = f"celery@{hostname}.{node_suffix}"
         

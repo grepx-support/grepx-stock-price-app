@@ -1,42 +1,10 @@
-from dagster_app.assets.base_assets import StockAssetFactory
-from servers.factors.config import cfg
+from dagster_app.assets.asset_factory_helper import create_asset_type
 
-config_prices_stocks = StockAssetFactory.create_prices_config_asset("stocks", "stocks")
-config_indicators_stocks = StockAssetFactory.create_indicators_config_asset("stocks", "stocks")
-globals()["config_prices_stocks"] = config_prices_stocks
-globals()["config_indicators_stocks"] = config_indicators_stocks
-
-# Create fetch asset
-fetch_stocks = StockAssetFactory.create_fetch_asset(
+create_asset_type(
     asset_type="stocks",
-    task_name="celery_app.tasks.stocks.stocks_tasks.fetch_stock_price",
-    group_name="stocks"
-)
-
-# Create store asset
-store_stocks = StockAssetFactory.create_store_asset(
-    asset_type="stocks",
-    task_name="celery_app.tasks.stocks.stocks_tasks.store_stock_price",
-    group_name="stocks"
-)
-
-# Create all indicator assets dynamically
-for indicator_name in cfg.indicators.keys():
-    indicator_asset = StockAssetFactory.create_indicator_asset(
-        asset_type="stocks",
-        indicator_name=indicator_name,
-        group_name="stocks"
-    )
-    globals()[f"stocks_{indicator_name.lower()}_indicator"] = indicator_asset
-    
-# Get list of indicator names
-indicator_names = list(cfg.indicators.keys())
-
-# Create store_indicators asset
-store_stocks_indicators = StockAssetFactory.create_store_indicators_asset(
-    asset_type="stocks",
-    task_name="celery_app.tasks.stocks.stocks_tasks.store",  # the store indicator task
     group_name="stocks",
-    indicator_names=indicator_names
+    fetch_task="celery_app.tasks.stocks.stocks_tasks.fetch_stocks_price",
+    store_task="celery_app.tasks.stocks.stocks_tasks.store_stocks_price",
+    store_indicators_task="celery_app.tasks.stocks.stocks_tasks.store",
+    globals_dict=globals()
 )
-globals()["store_stocks_indicators"] = store_stocks_indicators
