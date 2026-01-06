@@ -93,7 +93,7 @@ def store_data(price_data: List[Dict], asset_type: str = "stocks") -> int:
 
     # Get session from database connection
     conn = get_connection("primary_db")
-    session = conn._session
+    session = conn.session
     db_name = naming.get_analysis_db_name(asset_type)
 
     # Group data by symbol to store each symbol in its own table
@@ -185,7 +185,7 @@ def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> 
 
     # Get session from database connection
     conn = get_connection("primary_db")
-    session = conn._session
+    session = conn.session
 
     # Group by symbol and indicator type to store each combination separately
     indicators_by_symbol_and_type = {}
