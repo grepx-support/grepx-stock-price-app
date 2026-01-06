@@ -75,6 +75,11 @@ class DatabaseConnection(ConnectionBase):
             return obj[key]
         return self._session.backend
 
+    @property
+    def session(self):
+        """Get the ORM session."""
+        return self._session
+
     def connect(self) -> None:
         """Connect using ORM Session with a single event loop."""
         if self._client is not None:

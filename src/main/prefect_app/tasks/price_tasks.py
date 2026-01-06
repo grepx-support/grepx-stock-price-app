@@ -87,11 +87,13 @@ def store_data(price_data: List[Dict], asset_type: str = "stocks") -> int:
         return 0
     from database_app.services.stock_services import store_stock_price_data
     from database_app.services.naming import naming
-    from main import get_collection
+    from main import get_connection
     from servers.utils.logger import get_logger
     logger = get_logger(__name__)
 
-    # Get collection using the get_collection function
+    # Get session from database connection
+    conn = get_connection("primary_db")
+    session = conn.session
     db_name = naming.get_analysis_db_name(asset_type)
 
     # Group data by symbol to store each symbol in its own table
@@ -116,13 +118,10 @@ def store_data(price_data: List[Dict], asset_type: str = "stocks") -> int:
                 "count": len(symbol_data)
             }
 
-            # Get the appropriate collection
-            collection = get_collection(db_name, collection_name)
-            
-            # Use the existing service function to store the data
-            result = store_stock_price_data(formatted_data, collection)
+            # Use the service function with session, db_name, and collection_name
+            result = store_stock_price_data(formatted_data, session, db_name, collection_name)
 
-            stored_count = result.get("count", 0) if result.get("status") == "success" else 0
+            stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
             logger.info(f"Stored {stored_count} price records in collection '{collection_name}'")
             total_stored += stored_count
 
@@ -180,9 +179,14 @@ def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> 
     
     from database_app.services.indicator_services import store_single_factor
     from database_app.services.naming import naming
-    from main import get_collection
+    from main import get_connection
     from servers.utils.logger import get_logger
     logger = get_logger(__name__)
+
+    # Get session from database connection
+    conn = get_connection("primary_db")
+    session = conn.session
+
     # Group by symbol and indicator type to store each combination separately
     indicators_by_symbol_and_type = {}
     for item in indicator_data:
@@ -211,12 +215,9 @@ def store_indicators(indicator_data: List[Dict], asset_type: str = "stocks") -> 
         # Get collection name using naming convention
         collection_name = naming.get_indicator_collection_name(asset_type, symbol, indicator_type)
         try:
-            # Get the appropriate collection
-            collection = get_collection(db_name, collection_name)
-            
-            # Use the existing service function to store the indicators
-            result = store_single_factor(data, collection)
-            stored_count = result.get("count", 0) if result.get("status") == "success" else 0
+            # Use the service function with session, db_name, and collection_name
+            result = store_single_factor(data, session, db_name, collection_name)
+            stored_count = result.get("stored", 0) if result.get("status") == "success" else 0
             logger.info(f"Stored {stored_count} {indicator_type} indicator records in collection '{collection_name}'")
             total_stored += stored_count
         except Exception as e:
