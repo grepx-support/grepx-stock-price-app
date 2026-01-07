@@ -170,7 +170,7 @@ case "$1" in
         log "Starting all services..."
         # Prefect Infrastructure FIRST (Server → Worker)
         prefect_server
-        sleep 5  # Server startup time
+        sleep 20  # Server startup time
         prefect_worker
         sleep 2
         
